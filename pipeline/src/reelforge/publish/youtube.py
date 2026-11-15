@@ -90,9 +90,19 @@ def upload(cfg, video: Path, meta: dict) -> dict:
             status, response = req.next_chunk()
         except Exception as e:  # HttpError
             msg = str(e)
-            if "quotaExceeded" in msg or "exceeded your quota" in msg.lower():
+            low = msg.lower()
+            if "uploadlimitexceeded" in low or "exceeded the number of videos" in low:
                 raise RuntimeError(
-                    "YouTube daily quota exhausted (1,600 units per upload of 10,000/day).\n"
+                    "YouTube CHANNEL upload limit reached - this is not API quota.\n"
+                    "  YouTube caps how many videos one channel may upload per day, and\n"
+                    "  new or unverified channels get a low cap.\n"
+                    "  - Raise it: youtube.com/verify (phone verification, free).\n"
+                    "  - Or wait: the limit resets daily.\n"
+                    "  The reel stays unpublished and will retry on the next run."
+                ) from e
+            if "quotaexceeded" in low or "exceeded your quota" in low:
+                raise RuntimeError(
+                    "YouTube API quota exhausted (1,600 units per upload of 10,000/day).\n"
                     "  Resets at midnight Pacific. ~6 uploads/day per project."
                 ) from e
             raise

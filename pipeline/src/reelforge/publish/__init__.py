@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from .. import ledger
 from .. import meta as meta_mod
 from .. import state
 from . import facebook, instagram, youtube
@@ -69,6 +70,9 @@ def publish(cfg, store: state.Store, reel_id: str, platforms: list[str],
             continue
 
         store.record_pub(reel_id, platform, out["remote_id"], out.get("url", ""))
+        # Keep the committed ledger in step with local publishing, or CI
+        # re-uploads reels that are already live.
+        ledger.add(reel.get("topic_id"))
         print(f"     done {out.get('url') or out['remote_id']}")
         results[platform] = out
 

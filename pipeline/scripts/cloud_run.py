@@ -21,24 +21,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 os.environ.setdefault("REELFORGE_ROOT", str(ROOT))
 
-from reelforge import config, pipeline, state  # noqa: E402
+from reelforge import config, ledger, pipeline, state  # noqa: E402
 from reelforge import publish as publish_mod  # noqa: E402
 
-LEDGER = ROOT / "state" / "published.json"
-
-
-def load_ledger() -> list[str]:
-    if LEDGER.exists():
-        try:
-            return json.loads(LEDGER.read_text()).get("published", [])
-        except (ValueError, AttributeError):
-            return []
-    return []
-
-
-def save_ledger(done: list[str]) -> None:
-    LEDGER.parent.mkdir(parents=True, exist_ok=True)
-    LEDGER.write_text(json.dumps({"published": done}, indent=2) + "\n")
 
 
 def preflight(cfg) -> list[str]:
@@ -98,7 +83,7 @@ def main() -> int:
             return 1
         print("preflight: YouTube token refreshes OK")
 
-    done = load_ledger()
+    done = ledger.load()
     topics = [t for t in config.load_topics() if str(t["id"]) not in done]
     if not topics:
         print("::warning title=Out of topics::every topic in config/topics.yaml "
@@ -120,14 +105,11 @@ def main() -> int:
         )
         failures = result.get("_failures") or {}
 
-        posted = [p for p in publish_mod.PLATFORMS if p in result and not result[p].get("dry_run")]
-        if posted or not failures:
-            done.append(str(topic["id"]))
-            save_ledger(done)
+        # publish() writes the ledger itself; nothing to do here on success.
         for platform, err in failures.items():
             print(f"::warning title={platform} failed::{err[:300]}")
 
-    print(f"\nledger now holds {len(load_ledger())} published topic(s)")
+    print(f"\nledger now holds {len(ledger.load())} published topic(s)")
     return 0
 
 
