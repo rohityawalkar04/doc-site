@@ -1,0 +1,133 @@
+name: publish
+
+# Stage 2 of 2. Uploads reels that a `build` run already produced.
+#
+# Nothing is generated here: it downloads the artifact from the run you name,
+# uploads it, and records the topic in the committed ledger. That human step is
+# the point - a script and thirteen generated illustrations should not reach a
+# public channel unseen.
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "build run id (Actions > build > the run > its URL ends with this number)"
+        required: true
+      platforms:
+        description: "where to post"
+        type: choice
+        options:
+          - youtube
+          - instagram
+          - facebook
+          - youtube,facebook
+          - all
+        default: youtube
+      mode:
+        description: "publish, or rehearse without uploading"
+        type: choice
+        options:
+          - publish
+          - dry-run
+        default: publish
+
+permissions:
+  contents: write             # commit the ledger after a successful post
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: pipeline
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch the built reel from that run
+        uses: actions/download-artifact@v4
+        with:
+          name: reels
+          run-id: ${{ github.event.inputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: pipeline/out
+
+      - name: Show what was downloaded
+        run: ls -lh out/
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg >/dev/null
+
+      - name: Install Python dependencies
+        run: pip install --quiet -r requirements.txt
+
+      - name: Check required secrets are present
+        env:
+          YT_CLIENT_SECRET_JSON: ${{ secrets.YT_CLIENT_SECRET_JSON }}
+          YT_TOKEN_JSON: ${{ secrets.YT_TOKEN_JSON }}
+        run: |
+          missing=""
+          if [ -z "$YT_CLIENT_SECRET_JSON" ]; then missing="$missing YT_CLIENT_SECRET_JSON"; fi
+          if [ -z "$YT_TOKEN_JSON" ];        then missing="$missing YT_TOKEN_JSON"; fi
+          if [ -n "$missing" ]; then
+            echo "::error title=Missing repository secrets::Not set:$missing"
+            echo "  YT_TOKEN_JSON = the ENTIRE contents of secrets/yt_token.json on your machine"
+            exit 1
+          fi
+          echo "youtube secrets present"
+
+      - name: Materialise credentials
+        env:
+          YT_CLIENT_SECRET_JSON: ${{ secrets.YT_CLIENT_SECRET_JSON }}
+          YT_TOKEN_JSON: ${{ secrets.YT_TOKEN_JSON }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
+          FB_PAGE_TOKEN: ${{ secrets.FB_PAGE_TOKEN }}
+        run: |
+          mkdir -p secrets
+          printf '%s' "$YT_CLIENT_SECRET_JSON" > secrets/yt_client_secret.json
+          printf '%s' "$YT_TOKEN_JSON" > secrets/yt_token.json
+          {
+            echo "IG_LOGIN_TYPE=facebook"
+            echo "IG_USER_ID=$IG_USER_ID"
+            echo "IG_ACCESS_TOKEN=$IG_ACCESS_TOKEN"
+            echo "FB_PAGE_ID=$FB_PAGE_ID"
+            echo "FB_PAGE_TOKEN=$FB_PAGE_TOKEN"
+            echo "IG_HOST=gh_release"
+            echo "GH_RELEASE_REPO=${{ github.repository }}"
+          } > .env
+          chmod 600 .env secrets/*
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PYTHONUNBUFFERED: "1"
+        run: |
+          PYTHONPATH=src python -u scripts/publish_run.py \
+            --dir out \
+            --platforms "${{ github.event.inputs.platforms }}" \
+            ${{ github.event.inputs.mode == 'dry-run' && '--dry-run' || '' }}
+
+      - name: Record what was published
+        if: always()
+        run: |
+          git config user.name  "reelforge-bot"
+          git config user.email "reelforge-bot@users.noreply.github.com"
+          git add state/ 2>/dev/null || true
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: record published reel [skip ci]"
+            git push
+          else
+            echo "ledger unchanged"
+          fi

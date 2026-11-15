@@ -100,6 +100,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--count", type=int, default=1)
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--build-only", action="store_true",
+                    help="build reels for review; publish nothing and leave the ledger alone")
     args = ap.parse_args()
 
     if args.dry_run:
@@ -147,6 +149,11 @@ def main() -> int:
         print(f"\n=== {topic['id']} ===", flush=True)
         meta = pipeline.build(cfg, store, topic, keep_work=False)
         reel_id = meta["reel_id"]
+
+        if args.build_only:
+            print(f"  built for review: {meta['video_path']}")
+            print("  not publishing; run the `publish` workflow once you have watched it")
+            continue
 
         if args.dry_run:
             print("  dry run: not publishing")

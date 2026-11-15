@@ -1,0 +1,99 @@
+name: build
+
+# Stage 1 of 2. Builds reels and attaches them as an artifact. Publishes NOTHING.
+# Watch the artifact, then trigger the `publish` workflow with this run's id.
+#
+# Runs on a schedule so a reel is waiting for you each morning; it never posts.
+
+on:
+  schedule:
+    - cron: "30 3 * * *"      # 03:30 UTC = 09:00 IST
+  workflow_dispatch:
+    inputs:
+      count:
+        description: "how many reels to build"
+        default: "1"
+
+permissions:
+  contents: read              # build must not be able to change the ledger
+
+concurrency:
+  group: build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: pipeline
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg >/dev/null
+
+      - name: Install Python dependencies
+        run: pip install --quiet -r requirements.txt
+
+      - name: Verify dependencies and imports
+        env:
+          PYTHONPATH: src
+        run: |
+          python scripts/check_deps.py
+          python -c "
+          import reelforge.cli, reelforge.pipeline, reelforge.captions_png
+          import reelforge.visuals, reelforge.render, reelforge.voice
+          import reelforge.llm, reelforge.meta, reelforge.publish
+          print('imports OK')
+          "
+
+      - name: Cache piper voice
+        uses: actions/cache@v4
+        with:
+          path: pipeline/assets/piper
+          key: piper-en_US-ryan-high-v1
+
+      - name: Check required secrets are present
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          missing=""
+          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then missing="$missing CLOUDFLARE_ACCOUNT_ID"; fi
+          if [ -z "$CLOUDFLARE_API_TOKEN" ];  then missing="$missing CLOUDFLARE_API_TOKEN"; fi
+          if [ -n "$missing" ]; then
+            echo "::error title=Missing repository secrets::Not set:$missing"
+            echo "  CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN = dash.cloudflare.com > My Profile > API Tokens"
+            exit 1
+          fi
+          echo "image backend secrets present"
+
+      - name: Build for review
+        env:
+          AI_BACKEND: cloudflare
+          PYTHONUNBUFFERED: "1"
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          PYTHONPATH=src python -u scripts/cloud_run.py \
+            --count "${{ github.event.inputs.count || '1' }}" \
+            --build-only
+
+      - name: Attach the reel for review
+        uses: actions/upload-artifact@v4
+        with:
+          # Constant name so the publish workflow can find it by run id.
+          name: reels
+          path: |
+            pipeline/out/*.mp4
+            pipeline/out/*.json
+          if-no-files-found: error
+          retention-days: 14
