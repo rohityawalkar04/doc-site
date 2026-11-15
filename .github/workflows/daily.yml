@@ -151,12 +151,21 @@ jobs:
           git config user.name  "reelforge-bot"
           git config user.email "reelforge-bot@users.noreply.github.com"
           git add state/ 2>/dev/null || true
-          if ! git diff --cached --quiet; then
-            git commit -m "chore: record published reel [skip ci]"
-            git push
-          else
+          if git diff --cached --quiet; then
             echo "ledger unchanged"
+            exit 0
           fi
+          git commit -m "chore: record published reel [skip ci]"
+
+          # If this push fails the reel is live but unrecorded, so the next run
+          # uploads it again - the one path that can still create a duplicate.
+          for attempt in 1 2 3; do
+            git pull --rebase --autostash origin main >/dev/null 2>&1 || true
+            if git push; then echo "ledger pushed (attempt $attempt)"; exit 0; fi
+            sleep 5
+          done
+          echo "::error title=Ledger NOT recorded::push failed after 3 attempts. The reel is live but unrecorded, so the next run may re-upload it. Add the topic_id to state/published.json manually."
+          exit 1
 
       - name: Upload the render for inspection
         if: always()
