@@ -140,9 +140,12 @@ def main() -> int:
     done = ledger.load()
     topics = [t for t in config.load_topics() if str(t["id"]) not in done]
     if not topics:
-        print("::warning title=Out of topics::every topic in config/topics.yaml "
-              "has been published - add more")
-        return 0
+        # Deliberately a failure, not a warning: an unattended channel that has
+        # stopped posting is broken, and GitHub only notifies on failed runs. A
+        # green run with a warning would go unread for weeks.
+        print("::error title=Out of topics::every topic in config/topics.yaml has "
+              "been published - add more beats, or the channel stops here")
+        return 1
 
     store = state.Store(cfg.db)
     # count 0 means "work through the whole queue": the loop stops on its own at
