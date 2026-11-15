@@ -98,6 +98,16 @@ def cmd_doctor(args) -> int:
     line("facebook page", bool(os.environ.get("FB_PAGE_ID")), "FB_PAGE_ID")
     line("facebook token", bool(os.environ.get("FB_PAGE_TOKEN")), "FB_PAGE_TOKEN (Page token)")
 
+    print("\nsecret hygiene")
+    # A world-readable refresh token can upload to the channel as the owner.
+    for label, p in (("secrets/ dir", cfg.root / "secrets"), (".env", cfg.root / ".env")):
+        if not p.exists():
+            continue
+        mode = p.stat().st_mode & 0o777
+        too_open = bool(mode & 0o077)  # any group/other access
+        line(label, not too_open,
+             f"{oct(mode)}" + ("  <- chmod 700/600" if too_open else ""))
+
     print(f"\n{'all good' if ok else 'some checks failed - see above'}\n")
     return 0 if ok else 1
 

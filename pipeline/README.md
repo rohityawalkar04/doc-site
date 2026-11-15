@@ -221,6 +221,7 @@ asleep at 09:00 simply misses the run. If that matters, move to a $5 VPS.
 | Width/height not divisible by 8 | `ValueError: height and width have to be divisible by 8` | snapped to multiples of 8 before inference |
 | Several reels requesting TTS at once | a hung request blocks the whole reel (observed: 13 min on one scene) | 70 s hard timeout per attempt, 6 retries |
 | Fresh YouTube upload shows "Your browser can't play this video" | looks like a codec fault; it is transcoding - no playable stream exists yet | wait a few minutes; use `/watch?v=` while `/shorts/` lags |
+| Voice change silently changes reel length | 10 scenes at 2.13 wps (Prabhat) runs ~51 s; the same script at 2.90 wps (Andrew) runs ~35 s | recalibrate `script.words_per_second` whenever `voice.name` changes |
 | `edge-tts` rate-limits ~40% of calls | `NoAudioReceived` | 6 jittered retries + 0.45 s gap between scenes |
 | `edge-tts` defaults to **SentenceBoundary** | captions would be per-sentence, silently | `boundary="WordBoundary"` passed explicitly |
 | No word boundaries returned | captions would fail the reel | falls back to even spacing across real duration |
@@ -251,6 +252,66 @@ hung request used to stall a whole reel.
 
 Measured end-to-end: **5 reels (10 scenes each, ~35 s) in ~19 minutes**, versus
 ~20 minutes for a single reel before the resolution fix.
+
+## Running it in the cloud, for free
+
+The problem with scheduling this on a laptop: `launchd` does not fire if the Mac
+is asleep, and a closed laptop is a channel that silently stops posting.
+
+The free answer is **GitHub Actions + Cloudflare Workers AI**. No VPS, no GPU, no
+card, no machine at home.
+
+| Piece | Service | Free allowance |
+|---|---|---|
+| Schedule + compute | GitHub Actions | unmetered **on public repos** |
+| Images | Cloudflare Workers AI (`flux-1-schnell`) | 10,000 Neurons/day, no card (~200 images) |
+| Voice | `edge-tts` | unlimited |
+| Render | ffmpeg on the runner | CPU only, fine |
+| Publish | YouTube + Meta APIs | 6 YT uploads/day, 25 IG posts/day |
+| Instagram video host | GitHub **release asset** | no bucket needed |
+
+### Why these specific services
+
+- **Scheduled workflows only run on public repositories** on the GitHub Free plan.
+  Private repos need Pro. This is the single most common reason a free CI
+  schedule "just stops".
+- **Gemini's image API has no free tier** (quota stays at 0 until paid), so Google
+  is not an option for images even though you already have the account.
+- **Instagram fetches the video from a URL.** A GitHub release asset serves that
+  purpose, so R2 is optional rather than required.
+
+### Setup
+
+1. Repo must be **public**.
+2. Add secrets (Settings → Secrets and variables → Actions):
+
+   | Secret | From |
+   |---|---|
+   | `YT_CLIENT_SECRET_JSON` | the whole OAuth JSON, as one line |
+   | `YT_TOKEN_JSON` | `secrets/yt_token.json` after one local authorise |
+   | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` | Cloudflare dashboard |
+   | `IG_USER_ID`, `IG_ACCESS_TOKEN`, `FB_PAGE_ID`, `FB_PAGE_TOKEN` | `scripts/meta_setup.py` |
+
+3. Test it manually: **Actions → daily-reel → Run workflow**, `dry_run = true`.
+4. Then leave it: `cron: 30 3 * * *` = 09:00 IST.
+
+### What changes in the cloud
+
+- **No LLM** — `script.mode: beats`, so scripts come from `config/topics.yaml`.
+  Write them in batches; that part is still yours.
+- **No sqlite** — the runner is wiped each time, so "what has been published"
+  lives in `state/published.json`, committed back by the workflow.
+- **No image cache** — 13 images are regenerated per reel, ~580 Neurons, about 6%
+  of the daily allowance.
+
+### The catch that matters
+
+In **Testing** mode the Google refresh token expires every **7 days**, so an
+unattended job fails weekly and you would not notice. Moving the OAuth app to
+**production** is no longer cosmetic — it is a precondition for this design.
+
+Also: GitHub disables scheduled workflows after **60 days** of repository
+inactivity. The ledger commit each run is what keeps it alive.
 
 ## Layout
 

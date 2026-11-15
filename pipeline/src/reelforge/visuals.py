@@ -317,6 +317,64 @@ def _gen_pollinations(cfg, prompt: str, seed: int, dest: Path) -> Path | None:
     return None
 
 
+def _gen_cloudflare(cfg, prompt: str, seed: int, dest: Path) -> Path | None:
+    """Free hosted images: Cloudflare Workers AI, flux-1-schnell.
+
+    Workers Free gives 10,000 Neurons/day with no card. At roughly 45 Neurons an
+    image that is ~200 images/day, so a 13-scene reel costs ~6% of the allowance.
+    This is the backend that lets rendering run in CI, where there is no GPU.
+    """
+    import base64
+
+    acct = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "").strip()
+    token = os.environ.get("CLOUDFLARE_API_TOKEN", "").strip()
+    if not acct or not token:
+        print("    ! CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN not set")
+        return None
+
+    model = cfg.get("visuals.cf_model", "@cf/black-forest-labs/flux-1-schnell")
+    w = (int(cfg.get("visuals.ai_width", 512)) // 8) * 8
+    h = (int(cfg.get("visuals.ai_height", 768)) // 8) * 8
+    payload = {
+        "prompt": prompt,
+        "steps": int(cfg.get("visuals.cf_steps", 4)),
+        "width": w,
+        "height": h,
+        "seed": seed & 0x7FFFFFFF,
+    }
+    url = f"https://api.cloudflare.com/client/v4/accounts/{acct}/ai/run/{model}"
+    try:
+        r = requests.post(
+            url,
+            headers={"Authorization": f"Bearer {token}"},
+            json=payload,
+            timeout=int(cfg.get("visuals.cf_timeout", 180)),
+        )
+    except requests.RequestException as e:
+        print(f"    ! cloudflare request failed: {e}")
+        return None
+
+    ctype = r.headers.get("content-type", "")
+    if r.status_code == 200 and ctype.startswith("image/"):
+        dest.write_bytes(r.content)          # some models stream raw bytes
+        return dest
+
+    try:
+        body = r.json()
+    except ValueError:
+        print(f"    ! cloudflare {r.status_code}: {r.text[:200]}")
+        return None
+    if r.status_code != 200 or not body.get("success", False):
+        print(f"    ! cloudflare {r.status_code}: {str(body.get('errors'))[:200]}")
+        return None
+    b64 = (body.get("result") or {}).get("image")
+    if not b64:
+        print(f"    ! cloudflare returned no image: {str(body)[:200]}")
+        return None
+    dest.write_bytes(base64.b64decode(b64))
+    return dest
+
+
 def generate_image(cfg, query: str, seed: int, dest: Path) -> Path | None:
     """Generate one illustration. Cached on disk by seed, so re-renders are free."""
     if dest.exists() and dest.stat().st_size > 5000:
@@ -325,17 +383,18 @@ def generate_image(cfg, query: str, seed: int, dest: Path) -> Path | None:
     prompt = build_prompt(cfg, query)
     backend = cfg.get("visuals.ai_backend", "local_sd")
 
-    if backend == "local_sd":
-        img = _gen_local(cfg, prompt, seed, dest)
+    # In CI there is no GPU and no model cache, so hosted is tried first.
+    order = {
+        "local_sd": [_gen_local, _gen_cloudflare, _gen_pollinations],
+        "cloudflare": [_gen_cloudflare, _gen_pollinations, _gen_local],
+        "pollinations": [_gen_pollinations, _gen_cloudflare, _gen_local],
+    }.get(backend, [_gen_local, _gen_cloudflare, _gen_pollinations])
+
+    for gen in order:
+        img = gen(cfg, prompt, seed, dest)
         if img is not None:
             return img
-        # One shot at the hosted backend before giving up on the scene.
-        return _gen_pollinations(cfg, prompt, seed, dest)
-
-    img = _gen_pollinations(cfg, prompt, seed, dest)
-    if img is not None:
-        return img
-    return _gen_local(cfg, prompt, seed, dest)
+    return None
 
 
 # --------------------------------------------------------------------------- local
