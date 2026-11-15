@@ -1,0 +1,167 @@
+name: daily-reel
+
+# One run: build a reel and publish it. No handoff, no second workflow.
+#
+# Free because this repository is PUBLIC: scheduled workflows do not run on
+# private repos on the GitHub Free plan, and public repos are unmetered.
+
+on:
+  schedule:
+    - cron: "30 3 * * *"      # 03:30 UTC = 09:00 IST
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "publish, or build only and upload nothing"
+        type: choice
+        options:
+          - publish
+          - dry-run
+        default: publish
+      count:
+        description: "how many reels to build"
+        default: "1"
+
+permissions:
+  contents: write              # commit the ledger, create release assets
+
+concurrency:
+  group: daily-reel
+  cancel-in-progress: false
+
+jobs:
+  reel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: pipeline
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg >/dev/null
+
+      - name: Install Python dependencies
+        run: pip install --quiet -r requirements.txt
+
+      # Fail immediately, with a clear message, rather than importing halfway
+      # through a render. Pillow was once in pyproject.toml but not
+      # requirements.txt, and only CI noticed.
+      - name: Verify dependencies and imports
+        env:
+          PYTHONPATH: src
+        run: |
+          python scripts/check_deps.py
+          python -c "
+          import reelforge.cli, reelforge.pipeline, reelforge.captions_png
+          import reelforge.visuals, reelforge.render, reelforge.voice
+          import reelforge.llm, reelforge.meta, reelforge.publish
+          print('imports OK')
+          "
+
+      # The piper voice is 115 MB and gitignored; without this cache CI would
+      # re-download it on every run.
+      - name: Cache piper voice
+        uses: actions/cache@v4
+        with:
+          path: pipeline/assets/piper
+          key: piper-en_US-ryan-high-v1
+
+      - name: Check required secrets are present
+        env:
+          YT_CLIENT_SECRET_JSON: ${{ secrets.YT_CLIENT_SECRET_JSON }}
+          YT_TOKEN_JSON: ${{ secrets.YT_TOKEN_JSON }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          missing=""
+          if [ -z "$YT_CLIENT_SECRET_JSON" ]; then missing="$missing YT_CLIENT_SECRET_JSON"; fi
+          if [ -z "$YT_TOKEN_JSON" ];        then missing="$missing YT_TOKEN_JSON"; fi
+          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then missing="$missing CLOUDFLARE_ACCOUNT_ID"; fi
+          if [ -z "$CLOUDFLARE_API_TOKEN" ];  then missing="$missing CLOUDFLARE_API_TOKEN"; fi
+
+          if [ -n "$missing" ]; then
+            echo "::error title=Missing repository secrets::Not set:$missing"
+            echo "Add them: Settings > Secrets and variables > Actions > New repository secret"
+            case "$missing" in *YT_CLIENT_SECRET_JSON*)
+              echo "  YT_CLIENT_SECRET_JSON = the OAuth client JSON downloaded from Google Cloud";; esac
+            case "$missing" in *YT_TOKEN_JSON*)
+              echo "  YT_TOKEN_JSON = the ENTIRE contents of secrets/yt_token.json on your machine";; esac
+            case "$missing" in *CLOUDFLARE_*)
+              echo "  CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN = dash.cloudflare.com > My Profile > API Tokens";; esac
+            exit 1
+          fi
+          echo "required secrets present"
+
+      - name: Materialise credentials
+        env:
+          YT_CLIENT_SECRET_JSON: ${{ secrets.YT_CLIENT_SECRET_JSON }}
+          YT_TOKEN_JSON: ${{ secrets.YT_TOKEN_JSON }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
+          FB_PAGE_TOKEN: ${{ secrets.FB_PAGE_TOKEN }}
+          META_APP_ID: ${{ secrets.META_APP_ID }}
+          META_APP_SECRET: ${{ secrets.META_APP_SECRET }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          mkdir -p secrets
+          printf '%s' "$YT_CLIENT_SECRET_JSON" > secrets/yt_client_secret.json
+          printf '%s' "$YT_TOKEN_JSON" > secrets/yt_token.json
+          {
+            echo "IG_LOGIN_TYPE=facebook"
+            echo "IG_USER_ID=$IG_USER_ID"
+            echo "IG_ACCESS_TOKEN=$IG_ACCESS_TOKEN"
+            echo "FB_PAGE_ID=$FB_PAGE_ID"
+            echo "FB_PAGE_TOKEN=$FB_PAGE_TOKEN"
+            echo "META_APP_ID=$META_APP_ID"
+            echo "META_APP_SECRET=$META_APP_SECRET"
+            echo "CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID"
+            echo "CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN"
+            # Instagram fetches the file, so it must be publicly reachable.
+            # A release asset needs no extra service and no bucket to manage.
+            echo "IG_HOST=gh_release"
+            echo "GH_RELEASE_REPO=${{ github.repository }}"
+          } > .env
+          chmod 600 .env secrets/*
+
+      - name: Build and publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AI_BACKEND: cloudflare
+          PYTHONUNBUFFERED: "1"
+        run: |
+          PYTHONPATH=src python -u scripts/cloud_run.py \
+            --count "${{ github.event.inputs.count || '1' }}" \
+            ${{ github.event.inputs.mode == 'dry-run' && '--dry-run' || '' }}
+
+      - name: Record what was published
+        if: always()
+        run: |
+          git config user.name  "reelforge-bot"
+          git config user.email "reelforge-bot@users.noreply.github.com"
+          git add state/ 2>/dev/null || true
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: record published reel [skip ci]"
+            git push
+          else
+            echo "ledger unchanged"
+          fi
+
+      - name: Upload the render for inspection
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reels
+          path: |
+            pipeline/out/*.mp4
+            pipeline/out/*.json
+          if-no-files-found: ignore
+          retention-days: 14

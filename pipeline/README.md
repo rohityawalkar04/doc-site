@@ -292,7 +292,9 @@ card, no machine at home.
    | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` | Cloudflare dashboard |
    | `IG_USER_ID`, `IG_ACCESS_TOKEN`, `FB_PAGE_ID`, `FB_PAGE_TOKEN` | `scripts/meta_setup.py` |
 
-3. Test it manually: **Actions → daily-reel → Run workflow**, `dry_run = true`.
+3. Test it manually: **Actions → daily-reel → Run workflow**, set *mode* to
+   `dry-run` (a dropdown: `publish` or `dry-run`). Dry-run builds and attaches
+   the mp4 without posting anything.
 4. Then leave it: `cron: 30 3 * * *` = 09:00 IST.
 
 ### What changes in the cloud
