@@ -102,6 +102,11 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
+    if args.dry_run:
+        print("=" * 68)
+        print("DRY RUN - building only, NOTHING will be published to any platform.")
+        print("=" * 68, flush=True)
+
     cfg = config.load()
     cfg.override("script.mode", "beats")          # no LLM in CI
     cfg.override("visuals.provider", "ai_cartoon")

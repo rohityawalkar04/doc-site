@@ -10,12 +10,16 @@ on:
     - cron: "30 3 * * *"      # 03:30 UTC = 09:00 IST
   workflow_dispatch:           # manual trigger, for the first test run
     inputs:
+      mode:
+        description: "What to do"
+        type: choice
+        options:
+          - publish
+          - dry-run
+        default: publish
       count:
         description: "how many reels to build"
         default: "1"
-      dry_run:
-        description: "build but do not publish (true/false)"
-        default: "false"
 
 permissions:
   contents: write              # commit the ledger, create release assets
@@ -138,7 +142,7 @@ jobs:
         run: |
           PYTHONPATH=src python -u scripts/cloud_run.py \
             --count "${{ github.event.inputs.count || '1' }}" \
-            ${{ github.event.inputs.dry_run == 'true' && '--dry-run' || '' }}
+            ${{ github.event.inputs.mode == 'dry-run' && '--dry-run' || '' }}
 
       - name: Record what was published
         if: always()
