@@ -4,7 +4,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-REPO="${1:-gitaandgrit-site}"
+REPO="${1:-doc-site}"
 
 if ! gh auth status >/dev/null 2>&1; then
   echo "gh is not authenticated. Run: gh auth login -h github.com" >&2

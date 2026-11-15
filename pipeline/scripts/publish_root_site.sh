@@ -3,7 +3,7 @@
 #
 # Why: Google's OAuth branding check verifies ownership of the AUTHORIZED DOMAIN
 # (rohityawalkar04.github.io). A Search Console "URL prefix" property for
-# /gitaandgrit-site/ only proves the subpath, and the host root 404s - which reads
+# /doc-site/ only proves the subpath, and the host root 404s - which reads
 # to Google as a site that is not registered to you.
 #
 # Requires: gh auth login
@@ -47,12 +47,12 @@ cat > "$TMP/index.html" <<HTML
 <html lang="en"><head><meta charset="utf-8">
 <title>Gita &amp; Grit</title>
 <meta name="google-site-verification" content="">
-<link rel="canonical" href="https://$OWNER.github.io/gitaandgrit-site/">
-<meta http-equiv="refresh" content="0; url=https://$OWNER.github.io/gitaandgrit-site/">
+<link rel="canonical" href="https://$OWNER.github.io/doc-site/">
+<meta http-equiv="refresh" content="0; url=https://$OWNER.github.io/doc-site/">
 <style>body{margin:0;height:100vh;display:grid;place-items:center;background:#14121f;
 color:#ece9f5;font:16px/1.6 -apple-system,sans-serif}a{color:#ffd84d}</style>
 </head><body><p>Redirecting to
-<a href="https://$OWNER.github.io/gitaandgrit-site/">Gita &amp; Grit</a>…</p></body></html>
+<a href="https://$OWNER.github.io/doc-site/">Gita &amp; Grit</a>…</p></body></html>
 HTML
 
 git -C "$TMP" add -A

@@ -41,6 +41,43 @@ def save_ledger(done: list[str]) -> None:
     LEDGER.write_text(json.dumps({"published": done}, indent=2) + "\n")
 
 
+def preflight(cfg) -> list[str]:
+    """Fail before spending minutes on a render that cannot be published.
+
+    While the OAuth app is in Testing, the Google refresh token dies every 7 days.
+    Without this check the job renders a full reel and then fails at upload, which
+    wastes the run and buries the real cause.
+    """
+    problems: list[str] = []
+    import os
+
+    from google.auth.transport.requests import Request
+    from google.oauth2.credentials import Credentials
+
+    from reelforge.publish.youtube import SCOPES
+
+    token = cfg.path(os.environ.get("YT_TOKEN", "secrets/yt_token.json"))
+    if not token.exists():
+        problems.append(f"YouTube token missing at {token} - run a local publish once to authorise")
+        return problems
+    try:
+        creds = Credentials.from_authorized_user_file(str(token), SCOPES)
+        if not creds.valid:
+            creds.refresh(Request())
+    except Exception as e:  # noqa: BLE001 - the message is the point
+        detail = str(e)
+        hint = ""
+        if "invalid_grant" in detail or "expired" in detail.lower():
+            hint = (
+                "\n     -> refresh token expired. In Testing mode this happens every 7 days."
+                "\n     -> re-authorise locally: ./reelforge publish <reel> --platforms youtube --yes"
+                "\n     -> then commit the new secrets/yt_token.json into the YT_TOKEN_JSON secret."
+                "\n     -> publishing the OAuth app to production removes this permanently."
+            )
+        problems.append(f"YouTube token cannot refresh: {detail[:200]}{hint}")
+    return problems
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--count", type=int, default=1)
@@ -51,6 +88,15 @@ def main() -> int:
     cfg.override("script.mode", "beats")          # no LLM in CI
     cfg.override("visuals.provider", "ai_cartoon")
     cfg.override("visuals.ai_backend", os.environ.get("AI_BACKEND", "cloudflare"))
+
+    if not args.dry_run:
+        problems = preflight(cfg)
+        if problems:
+            for p in problems:
+                print(f"::error title=Credentials::{p.replace(chr(10), ' ')}")
+                print(p)
+            return 1
+        print("preflight: YouTube token refreshes OK")
 
     done = load_ledger()
     topics = [t for t in config.load_topics() if str(t["id"]) not in done]
