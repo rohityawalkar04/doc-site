@@ -47,6 +47,21 @@ jobs:
       - name: Install Python dependencies
         run: pip install --quiet -r requirements.txt
 
+      # Fail immediately, with a clear message, rather than importing halfway
+      # through a render. This step exists because Pillow was once in
+      # pyproject.toml but not requirements.txt, which only CI noticed.
+      - name: Verify dependencies and imports
+        env:
+          PYTHONPATH: src
+        run: |
+          python scripts/check_deps.py
+          python -c "
+          import reelforge.cli, reelforge.pipeline, reelforge.captions_png
+          import reelforge.visuals, reelforge.render, reelforge.voice
+          import reelforge.llm, reelforge.meta, reelforge.publish
+          print('imports OK')
+          "
+
       - name: Materialise credentials
         env:
           YT_CLIENT_SECRET_JSON: ${{ secrets.YT_CLIENT_SECRET_JSON }}
