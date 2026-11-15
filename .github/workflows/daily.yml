@@ -7,7 +7,10 @@ name: daily-reel
 
 on:
   schedule:
-    - cron: "30 3 * * *"      # 03:30 UTC = 09:00 IST
+    # 08:30 UTC = 14:00 IST. Deliberately AFTER 08:00 UTC, which is midnight
+    # Pacific: YouTube's per-channel daily upload cap (uploadLimitExceeded)
+    # resets there, so a run scheduled earlier can still see yesterday's cap.
+    - cron: "30 8 * * *"
   workflow_dispatch:
     inputs:
       mode:
