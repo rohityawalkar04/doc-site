@@ -41,6 +41,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # actions/checkout pins the commit that TRIGGERED this run, not current
+      # main. If another run published while this one was queued, that ledger
+      # entry is absent here and this run would upload the same topic again.
+      # Read the ledger from origin rather than trusting the checkout.
+      - name: Refresh the published ledger from main
+        run: |
+          git fetch --depth=1 origin main
+          git show origin/main:pipeline/state/published.json > state/published.json
+          python3 -c "import json;print('ledger entries:', len(json.load(open('state/published.json'))['published']))"
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
