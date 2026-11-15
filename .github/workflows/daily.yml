@@ -107,8 +107,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           AI_BACKEND: cloudflare
+          PYTHONUNBUFFERED: "1"
         run: |
-          PYTHONPATH=src python scripts/cloud_run.py \
+          PYTHONPATH=src python -u scripts/cloud_run.py \
             --count "${{ github.event.inputs.count || '1' }}" \
             ${{ github.event.inputs.dry_run == 'true' && '--dry-run' || '' }}
 

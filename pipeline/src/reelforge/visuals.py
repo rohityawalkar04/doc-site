@@ -386,7 +386,10 @@ def generate_image(cfg, query: str, seed: int, dest: Path) -> Path | None:
     # In CI there is no GPU and no model cache, so hosted is tried first.
     order = {
         "local_sd": [_gen_local, _gen_cloudflare, _gen_pollinations],
-        "cloudflare": [_gen_cloudflare, _gen_pollinations, _gen_local],
+                # No pollinations for the cloud backend: it is throttled to ~1 in 5
+        # and costs ~60s per image in retries before falling back, which
+        # reads as a frozen build.
+        "cloudflare": [_gen_cloudflare, _gen_local],
         "pollinations": [_gen_pollinations, _gen_cloudflare, _gen_local],
     }.get(backend, [_gen_local, _gen_cloudflare, _gen_pollinations])
 

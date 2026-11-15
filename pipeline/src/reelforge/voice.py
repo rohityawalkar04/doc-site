@@ -120,7 +120,8 @@ def synthesise(cfg, scenes: list[dict], audio_dir: Path) -> list[dict]:
     out: list[dict] = []
     total = len(scenes)
     for i, scene in enumerate(scenes, 1):
-        print(f"  [{i}/{total}] voice ({engine}) ...", flush=True)
+        ts = time.time()
+        print(f"    voice {i}/{total} ({engine}) ...", flush=True)
         if engine == "piper":
             path = audio_dir / f"scene_{i:02d}.wav"
             words = _piper_scene(scene["narration"], piper_model, path)
@@ -133,6 +134,7 @@ def synthesise(cfg, scenes: list[dict], audio_dir: Path) -> list[dict]:
             if not words:
                 words = _even_words(scene["narration"], duration(path))
             time.sleep(SCENE_GAP)
+        print(f"      {time.time() - ts:.1f}s  {scene['narration'][:52]}", flush=True)
         out.append({**scene, "audio_path": str(path), "words": words})
     return out
 

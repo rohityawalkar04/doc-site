@@ -10,6 +10,12 @@ from pathlib import Path
 from . import captions, captions_png, config, llm, render, state, visuals, voice
 
 
+def log(msg: str) -> None:
+    """Flushed, stamped output. CI captures stdout, so an unflushed print reads
+    as a frozen build - and a long step with no output reads as a hang."""
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
+
+
 def slug(text: str, limit: int = 52) -> str:
     s = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
     if len(s) <= limit:
@@ -35,12 +41,12 @@ def build(cfg, store: state.Store, topic: dict, keep_work: bool = True) -> dict:
     for sub in ("audio", "visual", "parts"):
         (work / sub).mkdir(parents=True, exist_ok=True)
 
-    print(f"\n[1/6] script  ({topic['title']})")
+    log(f"1/6 script  ({topic['title']})")
     t = time.time()
     script, source = llm.generate(cfg, topic)
     if source == "fallback":
         print(f"      ! ollama unavailable ({script.get('_fallback_reason')}) - using beat sheet")
-    print(f"      {time.time() - t:.1f}s via {source}")
+    log(f"    script done in {time.time() - t:.1f}s via {source}")
     meta = {
         "reel_id": reel_id,
         "topic_id": topic["id"],
@@ -55,7 +61,7 @@ def build(cfg, store: state.Store, topic: dict, keep_work: bool = True) -> dict:
     for i, s in enumerate(script["scenes"], 1):
         print(f"      {i:02d}. {s['narration']}")
 
-    print(f"[2/6] voice  ({len(script['scenes'])} scenes, engine={cfg.get('voice.engine')})")
+    log(f"2/6 voice - {len(script['scenes'])} scenes, engine={cfg.get('voice.engine')}")
     t = time.time()
     scenes = voice.synthesise(cfg, script["scenes"], work / "audio")
 
@@ -68,33 +74,35 @@ def build(cfg, store: state.Store, topic: dict, keep_work: bool = True) -> dict:
         scene["offset"] = round(offset, 3)
         offset = round(offset + scene["seconds"], 3)
     total = round(offset, 3)
-    print(f"      total {total:.1f}s in {time.time() - t:.1f}s")
+    log(f"    voice done: {total:.1f}s of audio in {time.time() - t:.1f}s")
 
-    print("[3/6] visuals")
+    log("3/6 visuals")
     t = time.time()
     audio_parts, video_parts = [], []
     used_visuals: set[str] = set()
     for i, scene in enumerate(scenes, 1):
-        print(f"      {i}/{len(scenes)} {scene['visual_query']!r}")
+        tv = time.time()
+        log(f"    scene {i}/{len(scenes)}: {scene['visual_query']!r}")
         vid, who = visuals.for_scene(
             cfg, store, i - 1, scene["seconds"], scene["visual_query"],
             work / "visual" / f"s{i:02d}.mp4", used=used_visuals,
         )
+        log(f"      -> {who} ({time.time() - tv:.1f}s)")
         scene["visual"] = who
         video_parts.append(vid)
         audio_parts.append(
             render.scene_audio(scene["audio_path"], scene["seconds"], work / "parts" / f"a{i:02d}.m4a")
         )
 
-    print(f"      {time.time() - t:.1f}s")
+    log(f"    done in {time.time() - t:.1f}s")
 
-    print("[4/6] assemble")
+    log("4/6 assemble")
     t = time.time()
     video_track = render.concat(video_parts, work / "video_track.mp4", work / "v.txt", with_audio=False)
     voice_track = render.concat(audio_parts, work / "voice_track.m4a", work / "a.txt", with_audio=True)
-    print(f"      {time.time() - t:.1f}s")
+    log(f"    done in {time.time() - t:.1f}s")
 
-    print("[5/6] captions")
+    log("5/6 captions")
     t = time.time()
     captions_obj = None
     if cfg.get("captions.enabled", True):
@@ -106,9 +114,9 @@ def build(cfg, store: state.Store, topic: dict, keep_work: bool = True) -> dict:
         else:
             captions_obj = captions_png.render(cfg, scenes, work / "caps")
             print(f"      mode=png ({len(captions_obj)} caption cards)")
-    print(f"      {time.time() - t:.1f}s")
+    log(f"    done in {time.time() - t:.1f}s")
 
-    print("[6/6] final render")
+    log("6/6 final render")
     t = time.time()
     music = render.find_music(cfg) or render.ensure_music_bed(work)
     out = cfg.out / f"{reel_id}.mp4"
@@ -131,6 +139,6 @@ def build(cfg, store: state.Store, topic: dict, keep_work: bool = True) -> dict:
         shutil.rmtree(work, ignore_errors=True)
     else:
         print(f"      work kept at {work}")
-    print(f"      {time.time() - t:.1f}s")
-    print(f"      -> {out}  ({meta['duration']:.1f}s)")
+    log(f"    done in {time.time() - t:.1f}s")
+    log(f"    -> {out.name}  ({meta['duration']:.1f}s)")
     return meta

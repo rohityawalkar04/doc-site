@@ -22,6 +22,10 @@ sys.path.insert(0, str(ROOT / "src"))
 os.environ.setdefault("REELFORGE_ROOT", str(ROOT))
 
 from reelforge import config, ledger, pipeline, state  # noqa: E402
+
+# CI captures stdout, so Python block-buffers it and progress appears in
+# 8KB lumps - which looks exactly like a hang.
+sys.stdout.reconfigure(line_buffering=True)
 from reelforge import publish as publish_mod  # noqa: E402
 
 
@@ -82,6 +86,20 @@ def main() -> int:
                 print(p)
             return 1
         print("preflight: YouTube token refreshes OK")
+
+    if not args.dry_run and cfg.get("visuals.ai_backend") == "cloudflare":
+        missing = [k for k in ("CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN")
+                   if not os.environ.get(k, "").strip()]
+        if missing:
+            msg = (
+                f"missing {', '.join(missing)}. Add them as repository secrets.\n"
+                "  Without them every scene falls back to procedural gradients.\n"
+                "  Cloudflare Workers AI: free 10,000 neurons/day, no card required."
+            )
+            print(f"::error title=Image backend::{msg.replace(chr(10), ' ')}")
+            print(msg)
+            return 1
+        print("preflight: Cloudflare Workers AI configured")
 
     done = ledger.load()
     topics = [t for t in config.load_topics() if str(t["id"]) not in done]
