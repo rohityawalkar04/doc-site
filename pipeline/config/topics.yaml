@@ -191,3 +191,373 @@ topics:
     v: a figure carrying a heavy sack uphill
   - n: Stop collecting. Start paying for it with action.
     v: an open empty hand held out in daylight
+- id: identity-not-motivation
+  kind: motivation
+  title: You do not need more motivation
+  angle: Motivation is a mood that arrives late. Identity is a decision made earlier, when it was cheap, so the hard moment is no longer a choice.
+  hashtags:
+  - '#shorts'
+  - '#motivation'
+  - '#identity'
+  - '#discipline'
+  - '#habits'
+  beats:
+  - n: You do not need more motivation. You need a smaller identity.
+    v: a single lit match on a dark table
+  - n: Motivation is a mood. It arrives late and leaves early.
+    v: an empty chair beside a cold cup of tea
+  - n: Identity is a decision about what kind of person you are.
+    v: a plain mirror on a bare wall
+  - n: So stop asking how to feel driven and start asking who does this.
+    v: a worn pair of shoes by a door
+  - n: The person who runs does not negotiate at six in the morning.
+    v: a dark kitchen window before sunrise
+  - n: They are not stronger. They decided earlier, when it was cheap.
+    v: a clock face on a plain wall
+  - n: Decide once, in daylight, and let the decision do the work.
+    v: a single line drawn on paper
+  - n: Then the hard moment is not a choice. It is a habit already made.
+    v: a well worn wooden stair
+  - n: You will still feel unmotivated. That stops mattering.
+    v: a person walking through grey rain
+  - n: Feelings are weather. Identity is the house you built.
+    v: a small house lit against a storm
+  - n: 'So pick one thing and say: this is what I do now.'
+    v: a hand placing a stone on a wall
+  - n: Do it badly this week. Identity does not require applause.
+    v: a rough brick in an unfinished wall
+  - n: Act like them for a month. Then notice it stopped being acting.
+    v: a person standing taller in warm light
+- id: environment-over-willpower
+  kind: motivation
+  title: You are losing to your room, not your weakness
+  angle: Willpower is expensive and finite. Every decision you remove from the environment is a decision you never have to win again.
+  hashtags:
+  - '#shorts'
+  - '#motivation'
+  - '#habits'
+  - '#willpower'
+  - '#discipline'
+  beats:
+  - n: You are not losing to weakness. You are losing to your room.
+    v: a cluttered desk in dim light
+  - n: Willpower is the most expensive thing you own and it runs out.
+    v: a candle burning low
+  - n: So stop spending it on decisions you could have removed.
+    v: a hand pushing a heavy door
+  - n: Put the guitar where you sit, not where you store things.
+    v: a guitar leaning against a chair
+  - n: Put the phone in another room while you work, not on silent.
+    v: a phone face down on a distant shelf
+  - n: Make the good thing one step closer and the bad thing further.
+    v: two doors one ajar and one shut
+  - n: This is not discipline. It is carpentry.
+    v: a hammer and nails on a workbench
+  - n: You are building a room that argues on your behalf.
+    v: a small tidy room with morning light
+  - n: Every friction you remove is a decision you never make again.
+    v: a smooth stone path
+  - n: And every friction you leave is a tax you pay daily.
+    v: a narrow doorway with a low beam
+  - n: So choose one habit and change the room, not your resolve.
+    v: a chair moved closer to a window
+  - n: Move one object tonight. That is the whole instruction.
+    v: a hand moving a small wooden stool
+  - n: Then let the room carry you on the days you cannot.
+    v: a lit lamp in a quiet room at dusk
+- id: finish-not-start
+  kind: motivation
+  title: You are short of finished things, not ideas
+  angle: Starting is cheap and exciting. Finishing is quiet and expensive, which is why the pile grows and quietly costs attention.
+  hashtags:
+  - '#shorts'
+  - '#motivation'
+  - '#focus'
+  - '#discipline'
+  - '#followthrough'
+  beats:
+  - n: You are not short of ideas. You are short of finished things.
+    v: a shelf of half built wooden shapes
+  - n: Starting is exciting and cheap. Finishing is quiet and expensive.
+    v: a workbench with tools set down
+  - n: So the pile grows, and each item quietly costs you attention.
+    v: a stack of unfinished notebooks
+  - n: An unfinished thing is not potential. It is a debt.
+    v: a half built chair in a dusty room
+  - n: Choose the ugly one. Finish the thing you are least proud of.
+    v: a rough wooden box unsanded
+  - n: Pick the smallest unfinished item. Not the most impressive.
+    v: a tiny wooden peg beside a large beam
+  - n: Give it one session with a defined ending you can point at.
+    v: a single line drawn to the page edge
+  - n: Then put it on the shelf where you can see it.
+    v: a finished bowl on a bright shelf
+  - n: Finishing is a muscle and it is trained with small weights.
+    v: a small hand tool resting on wood
+  - n: You do not need new ideas. You need the end of an old one.
+    v: a road ending at a closed gate
+  - n: Each finished thing returns attention you forgot you had.
+    v: a cleared desk in morning light
+  - n: So finish one thing before you begin anything else.
+    v: a hand closing a notebook
+  - n: The pile shrinks. That feeling is competence, not luck.
+    v: an empty shelf with dust marks
+- id: say-no-shrink-list
+  kind: motivation
+  title: You need a shorter list, not a better one
+  angle: Most yeses are made quickly to avoid an awkward moment. The moment is cheap; the commitment is not.
+  hashtags:
+  - '#shorts'
+  - '#motivation'
+  - '#focus'
+  - '#boundaries'
+  - '#discipline'
+  beats:
+  - n: You do not need a better to do list. You need a shorter one.
+    v: a long paper list with many lines
+  - n: Every yes is a promise about your future time.
+    v: a hand stamping a wax seal
+  - n: And most yeses are made quickly, to avoid an awkward moment.
+    v: a small closed door in a hallway
+  - n: That moment is cheap. The commitment is not.
+    v: a heavy iron key on a table
+  - n: So count what fits instead of what you could manage.
+    v: a small wooden box with the lid open
+  - n: If it does not fit, the honest answer today is no.
+    v: a gate closed with a rope
+  - n: No is not a rejection of the person. It defends the work.
+    v: a shield of plain wood
+  - n: You will disappoint someone. Choose to disappoint them early.
+    v: a person standing calmly at a door
+  - n: Silence is not kindness. It is a delayed no with interest.
+    v: an unopened envelope on a table
+  - n: So keep two things. Do them properly. Let the rest go.
+    v: two smooth stones held in one hand
+  - n: Saying no today buys attention for tomorrow.
+    v: a cleared workspace in soft light
+  - n: Pick one thing to stop this week. Say it out loud.
+    v: a hand crossing a line off paper
+  - n: Subtraction looks like loss and feels like relief.
+    v: an empty room with a wide window
+- id: comparison-highlight-reel
+  kind: motivation
+  title: You are comparing your Tuesday to their highlights
+  angle: Comparison is not motivation, it is usually justification. You are the only person whose context you can actually see.
+  hashtags:
+  - '#shorts'
+  - '#motivation'
+  - '#comparison'
+  - '#focus'
+  - '#mindset'
+  beats:
+  - n: You are comparing your ordinary Tuesday to someone's highlights.
+    v: a bright framed image beside a bare wall
+  - n: They chose that frame. You did not see the other nine hundred.
+    v: a stack of discarded photographs
+  - n: So you measure your whole life against a selected minute.
+    v: a small measuring tape across a room
+  - n: That is not envy. It is a bad experiment.
+    v: a set of scales with unequal weights
+  - n: You are the only person whose context you can actually see.
+    v: a window showing only one landscape
+  - n: So compete with last month, not with a stranger's post.
+    v: two footprints side by side in sand
+  - n: Your comparison is not motivation. It is usually justification.
+    v: a hand pointing at a distant hill
+  - n: Justification to stop, or to start something you do not want.
+    v: an open gate leading away
+  - n: Close the app and look at what you actually built this year.
+    v: worn tools on a used workbench
+  - n: That is the only scoreboard with real numbers on it.
+    v: a handwritten ledger on a table
+  - n: You are behind no one. You are on a different clock.
+    v: two clocks showing different hours
+  - n: So write down what you finished, not what you envy.
+    v: a pencil writing on a plain page
+  - n: The feed is not a mirror. Stop using it as one.
+    v: a mirror turned to face a wall
+- id: cheap-decisions-fast
+  kind: motivation
+  title: You are tired from small decisions
+  angle: Almost every choice you make today is reversible and cheap, yet each gets the attention of a real risk.
+  hashtags:
+  - '#shorts'
+  - '#motivation'
+  - '#decisions'
+  - '#focus'
+  - '#discipline'
+  beats:
+  - n: You are exhausted from deciding small things, not doing big ones.
+    v: a table covered in small objects
+  - n: Almost every choice you make today is reversible and cheap.
+    v: a light wooden door swinging open
+  - n: Yet you give each one the same attention as a real risk.
+    v: a single coin balanced on its edge
+  - n: That is how an afternoon disappears without anything happening.
+    v: an empty chair with a clock behind it
+  - n: So sort your decisions by what happens if you are wrong.
+    v: two boxes one open and one sealed
+  - n: If you can undo it, decide quickly and move.
+    v: a hand drawing a quick line
+  - n: If you cannot undo it, slow down and gather one more fact.
+    v: a stone door with heavy hinges
+  - n: Most people invert this and spend hours on lunch.
+    v: a plate of plain food on a table
+  - n: Speed on the cheap ones buys patience for the expensive ones.
+    v: a smooth stone next to a rough one
+  - n: Choose a default for anything you do not care about.
+    v: a single arrow painted on a wall
+  - n: Then stop relitigating it every single day.
+    v: a closed drawer with a small handle
+  - n: Make one reversible decision today in under a minute.
+    v: a hand pressing a small button
+  - n: Attention is what you are actually spending. Budget it.
+    v: a lantern set down on a table
+- id: attention-residue
+  kind: motivation
+  title: You are bad at not switching, not at focusing
+  angle: Every context swap leaves part of your attention stuck behind. The enemy is not interruption, it is abandonment.
+  hashtags:
+  - '#shorts'
+  - '#motivation'
+  - '#focus'
+  - '#attention'
+  - '#deepwork'
+  beats:
+  - n: You are not bad at focusing. You are bad at not switching.
+    v: a desk with three open books
+  - n: Every swap leaves a little of your attention stuck behind.
+    v: a spilled cup of dark tea
+  - n: So you finish a day of work and cannot say what you did.
+    v: a chair pushed back from a desk at night
+  - n: The problem is not the interruption. It is the residue.
+    v: dust settling on a windowsill
+  - n: One thing at a time is not discipline. It is accounting.
+    v: a single line of coins on a table
+  - n: Close the tabs. Not most of them. All of them but one.
+    v: a laptop with a plain empty screen
+  - n: Write the next action on paper so you do not hold it.
+    v: a small note under a paperweight
+  - n: When something arrives, write it down and return.
+    v: a pencil resting on an open page
+  - n: That return is the entire skill, and it is trainable.
+    v: a door closing softly into place
+  - n: You will still be interrupted. Interruptions are not the enemy.
+    v: rain against a single window pane
+  - n: Abandonment is. Never leave a thing half understood.
+    v: an unfinished wooden joint
+  - n: So choose one task and finish it before opening anything.
+    v: a hand closing a single book
+  - n: Focus is not a mood. It is a shorter list of open loops.
+    v: one lantern in a dark room
+- id: deadline-compresses
+  kind: motivation
+  title: A task takes as long as you give it
+  angle: Without an edge the work expands to fill the silence. A short clock finished beats a long clock perfecting.
+  hashtags:
+  - '#shorts'
+  - '#motivation'
+  - '#deadlines'
+  - '#focus'
+  - '#discipline'
+  beats:
+  - n: A task will take as long as the time you give it.
+    v: an empty hourglass on a desk
+  - n: So a week becomes the work of an afternoon, spread thin.
+    v: a thin layer of sand on a wide board
+  - n: This is not laziness. It is how attention behaves near edges.
+    v: a stone at the edge of a cliff
+  - n: Without an edge, the work expands to fill the silence.
+    v: a candle flame in an empty room
+  - n: So give the thing a real ending, written down and visible.
+    v: a date circled on a wall calendar
+  - n: Not a deadline for the project. One for the next hour.
+    v: a small clock beside a single page
+  - n: Choose what must be true by the end of it.
+    v: a line drawn across paper
+  - n: Then let the smaller clever ideas wait.
+    v: a rough sketch pushed aside
+  - n: Finishing on a short clock beats perfecting on a long one.
+    v: a finished plain bowl
+  - n: You can always improve a thing that exists.
+    v: a rough sculpture catching light
+  - n: So shorten the horizon deliberately, not anxiously.
+    v: a short path beside a long road
+  - n: Set a timer for the next thing you are avoiding.
+    v: a hand turning a small dial
+  - n: Constraint is not pressure. It is permission to stop.
+    v: a door closing gently at dusk
+- id: recovery-is-work
+  kind: motivation
+  title: Rest is not the reward for finishing
+  angle: Treating rest as a reward makes recovery a debt you can never pay. It is part of the work, planned like the start.
+  hashtags:
+  - '#shorts'
+  - '#motivation'
+  - '#burnout'
+  - '#recovery'
+  - '#sustainability'
+  beats:
+  - n: You are treating rest as the reward for finishing.
+    v: a bed with a folded blanket
+  - n: That makes recovery a debt you can never pay.
+    v: a stack of unopened envelopes
+  - n: So you work until you are useless, then call it a break.
+    v: a person sitting slumped at a desk
+  - n: And you return to the same work with less of yourself.
+    v: a candle burned almost to the wax
+  - n: Recovery is not the opposite of work. It is part of it.
+    v: a field lying fallow in low light
+  - n: Muscles, attention, judgement. All of it rebuilds when you stop.
+    v: a stone wall rebuilding after rain
+  - n: So plan the stop the way you plan the start.
+    v: a clock and a closed book together
+  - n: An ending hour is not indulgence. It is scheduling.
+    v: a lamp switched off at night
+  - n: If you cannot stop, that is the problem worth solving.
+    v: a wheel still spinning after the hand lifts
+  - n: Not your output. Your ability to stop at all.
+    v: an anchor resting in still water
+  - n: So choose a time tonight and refuse to negotiate with it.
+    v: a hand setting down a pen
+  - n: Leave something unfinished on purpose. It will wait.
+    v: a half knitted scarf on a chair
+  - n: The work that lasts is built by people who rest on purpose.
+    v: a low sun over a quiet field
+- id: compounding-reps
+  kind: motivation
+  title: You are waiting for intensity
+  angle: Intensity is the least important variable. What compounds is the boring repetition you did not want to do.
+  hashtags:
+  - '#shorts'
+  - '#motivation'
+  - '#consistency'
+  - '#habits'
+  - '#discipline'
+  beats:
+  - n: You are waiting for intensity. Intensity is the least important part.
+    v: a single heavy stone
+  - n: One enormous effort is easy to remember and easy to abandon.
+    v: a ruined wooden cart in mud
+  - n: What compounds is the boring rep you did not want to do.
+    v: a small stone placed on a growing pile
+  - n: You will not be able to point at one day and say it mattered.
+    v: an unremarkable grey morning
+  - n: That is the point. The evidence looks like nothing.
+    v: a smooth path of ordinary stones
+  - n: So judge the system by whether you did it, not how it felt.
+    v: a hand pressing a plain stamp
+  - n: A week of small effort looks like nothing. A year does not.
+    v: a young tree beside a tall one
+  - n: The people ahead of you are not doing more each day.
+    v: two runners on a long road
+  - n: They are doing the same thing after it stopped being interesting.
+    v: a worn wooden handle
+  - n: So lower the size until the size stops being a question.
+    v: a small tool laid out on cloth
+  - n: One page. One call. One repetition. That is enough today.
+    v: a single mark on a page
+  - n: Do it again tomorrow without adjusting anything.
+    v: the same stone added again
+  - n: Compounding is boring right up until it is obvious.
+    v: a full jar of small stones
