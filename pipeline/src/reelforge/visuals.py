@@ -333,14 +333,14 @@ def _gen_cloudflare(cfg, prompt: str, seed: int, dest: Path) -> Path | None:
         return None
 
     model = cfg.get("visuals.cf_model", "@cf/black-forest-labs/flux-1-schnell")
-    w = (int(cfg.get("visuals.ai_width", 512)) // 8) * 8
-    h = (int(cfg.get("visuals.ai_height", 768)) // 8) * 8
+
+    # flux-1-schnell accepts ONLY prompt and steps. Sending width/height/seed
+    # returns "Additional or unevaluated properties ... not allowed" (code 5006).
+    # It also always renders a square, which from_image crops to 9:16 - hence the
+    # style prompt asks for a centred subject in a vertical composition.
     payload = {
         "prompt": prompt,
-        "steps": int(cfg.get("visuals.cf_steps", 4)),
-        "width": w,
-        "height": h,
-        "seed": seed & 0x7FFFFFFF,
+        "steps": min(int(cfg.get("visuals.cf_steps", 4)), 8),  # flux-schnell caps at 8
     }
     url = f"https://api.cloudflare.com/client/v4/accounts/{acct}/ai/run/{model}"
     try:
