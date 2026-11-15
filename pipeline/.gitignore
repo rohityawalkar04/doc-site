@@ -1,0 +1,12 @@
+.venv/
+.env
+work/
+out/
+assets/cache/
+assets/music/*.mp3
+assets/music/*.wav
+assets/broll/*.mp4
+secrets/
+*.log
+__pycache__/
+.DS_Store

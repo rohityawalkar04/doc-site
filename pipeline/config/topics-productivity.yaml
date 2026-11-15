@@ -1,0 +1,100 @@
+# Parked, not deleted: the solo-operator business-ops topics.
+# These belong on a second channel, not on Gita & Grit. Swap this file in with
+#   cp config/topics-productivity.yaml config/topics.yaml
+topics:
+- id: invoice-ritual
+  title: The 20-minute weekly invoice ritual that ends late payments
+  angle: 'Invoicing late is the real reason freelancers get paid late. Argue for a fixed weekly slot, invoice on completion rather than month end, and a 3-line reminder ladder that is polite the first time.
+
+    '
+  beats:
+  - You are not being paid late. You are invoicing late.
+  - Month-end billing gives every client thirty free days.
+  - Invoice the day the work ships, not the day the month ends.
+  - Put one twenty-minute slot on Friday and clear the whole week.
+  - 'Then a three-line reminder: sent it, checking in, final notice.'
+  - Polite the first time. Automatic the last. That is the whole system.
+- id: follow-up-email
+  title: Why your follow-up email dies in the inbox
+  angle: 'Follow-ups fail because they ask the reader to remember context. The fix is a two-line reply that restates the ask and removes every decision except yes.
+
+    '
+  beats:
+  - Most follow-ups get ignored, and it is not because people are rude.
+  - They get ignored because reading them costs a decision.
+  - Your email asks the reader to reopen the old thread and remember it.
+  - So write two lines. One restates the ask in full.
+  - The other names one date and one action.
+  - Reply yes or reply no. That is the only choice left.
+- id: voice-memo
+  title: Turn one voice memo into a week of content
+  angle: 'Speaking is faster than writing, so capture ideas by talking on a walk and transcribe once. One 4-minute memo usually contains five separate posts.
+
+    '
+  beats:
+  - You do not have a writing problem. You have a capture problem.
+  - Walking and talking produces four times the words per minute.
+  - Record one memo per walk. Do not structure it.
+  - Transcribe it once and read it back cold.
+  - Every paragraph that survives the read is a post.
+  - One memo is usually five posts. That is your week.
+- id: meeting-notes
+  title: Stop writing meeting notes. Capture decisions instead.
+  angle: 'Notes describe a conversation nobody rereads. A decision log captures what was agreed, who owns it, and the date it is due - three columns, one line per meeting.
+
+    '
+  beats:
+  - Nobody has ever reread your meeting notes. Including you.
+  - Notes record what was said. That is not what you needed.
+  - What you needed was what was decided, and by whom.
+  - So keep three columns. Decision, owner, date.
+  - One line per meeting. Nothing else survives the week anyway.
+  - Twelve weeks in, you have a record of every promise.
+- id: three-tab-crm
+  title: The three-tab spreadsheet that replaces a paid CRM
+  angle: 'Under about fifty relationships a CRM is overhead. Three tabs - people, last touch, next touch - beat any tool you will stop opening.
+
+    '
+  beats:
+  - If you have fewer than fifty real relationships, a CRM is overhead.
+  - You are paying monthly for a database you open twice a month.
+  - Three tabs beat it. People, last touch, next touch.
+  - Last touch is a date. Next touch is a date.
+  - Sort by next touch. The top row is your job today.
+  - That is the entire system. Nothing to log in to.
+- id: onboarding-length
+  title: Your onboarding email is six emails too long
+  angle: 'Onboarding sequences optimise for completeness instead of first value. Cut to the single action that produces a result, send it in the first ten minutes, then stop.
+
+    '
+  beats:
+  - Your onboarding sequence is six emails long. It should be one.
+  - Long sequences are written for completeness, not for the user.
+  - The only thing a new user needs is one action that works.
+  - Send that action within ten minutes of signup.
+  - Then send nothing until they have done it.
+  - Fewer emails, higher activation. That is the trade.
+- id: one-inbox
+  title: The one-inbox rule that ends app switching
+  angle: 'Context switching, not volume, is what makes inboxes feel unbearable. Route every request into one queue and drain it in one sitting instead of five apps.
+
+    '
+  beats:
+  - Your inbox is not too full. It is in five different apps.
+  - Every app you check is a context switch you pay for twice.
+  - Forward every request into one queue. Slack, DMs, tickets.
+  - Then close the other apps during work blocks.
+  - Drain the queue once, in order, first thing.
+  - One list. One sitting. That is what makes it bearable.
+- id: weekly-review
+  title: The fifteen-minute weekly review that actually sticks
+  angle: 'Weekly reviews fail when they are reflective journals. Strip to three questions that force a decision: what shipped, what is stuck, what gets dropped.
+
+    '
+  beats:
+  - Most weekly reviews are journals. That is why you stopped.
+  - Reflection feels productive and changes nothing.
+  - Ask three questions instead. What shipped?
+  - What is stuck, and what is the one blocker?
+  - What are you dropping this week? Answer that or nothing changes.
+  - Fifteen minutes, Friday, same slot. That is the whole ritual.

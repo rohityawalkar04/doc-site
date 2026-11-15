@@ -1,0 +1,137 @@
+# One file = one channel. Everything the pipeline needs to make a reel.
+
+name: Gita & Grit
+
+# ---- what the channel is about -------------------------------------------------
+lens: "Hindu mythology and old stories, turned into one usable rule for today"
+audience: "Indian and diaspora viewers, 20-45, who want meaning without being preached at"
+tone: "plain, unhurried, concrete. Reverent about the source, never sermonising."
+language: en
+
+# ---- script ---------------------------------------------------------------------
+llm:
+  provider: ollama
+  model: qwen2.5:7b-instruct
+  temperature: 0.8
+  timeout: 300
+
+script:
+  # Instagram/YouTube ask for 30-60s. ~3 words/second at this voice's pace, so
+  # 10-12 scenes of 8-14 words lands at 28-40s. Prefer more scenes over longer
+  # scenes: a model asked to write longer lines pads, and padding kills retention.
+  min_scenes: 12
+  max_scenes: 13
+  words_per_scene: [8, 14]
+  target_seconds: 34
+  min_seconds: 30
+  words_per_second: 2.9   # measured at rate +0% on en-US-AndrewNeural
+  attempts: 2
+
+# ---- voice ----------------------------------------------------------------------
+# engine: edge  -> fastest to working, no key. Microsoft voices; not clearly
+#                  licensed for commercial reuse. Fine for testing.
+# engine: kokoro -> Apache-2.0 local model, clean rights. Requires `pip install kokoro soundfile`.
+voice:
+  engine: edge
+  name: en-IN-PrabhatNeural   # Indian English; matches the channel's audience
+  rate: "+0%"              # +8% shaved ~8% off duration; natural pace clears 30s
+  pitch: "+0Hz"
+  kokoro_voice: af_heart
+
+# ---- captions -------------------------------------------------------------------
+captions:
+  enabled: true
+  # auto -> ASS karaoke if this ffmpeg has libass, else Pillow PNG cards.
+  # Homebrew's ffmpeg 8 has no libass, so `auto` resolves to png here.
+  mode: auto
+  font: Anton
+  size: 88
+  uppercase: true
+  max_words_per_line: 3
+  max_chars_per_line: 20
+  primary: "&H004DD8FF"     # ASS &HAABBGGRR - spoken word colour (warm yellow)
+  secondary: "&H00FFFFFF"   # unspoken word colour
+  outline: "&H00101010"
+  outline_width: 7
+  y: 1230                   # vertical centre of the caption block, of 1920
+  slide_px: 22              # cards rise this many px on entry (0 disables)
+  slide_s: 0.18
+
+# ---- visuals --------------------------------------------------------------------
+visuals:
+  # provider: procedural -> ffmpeg gradients, zero keys, good for testing
+  #           ai_cartoon -> free AI illustrations (Pollinations), animated
+  #           pexels     -> licensed stock video/images (needs PEXELS_API_KEY)
+  #           local      -> whatever you drop in assets/broll/
+  provider: ai_cartoon
+  animate: true            # slow zoom/pan on stills; a slideshow is not a reel
+
+  # Appended to every scene's visual_query. Flat illustration asks the model for
+  # shapes and outlines rather than photoreal mush, and "no text" matters because
+  # image models render lettering as garbage.
+  style_prompt: >-
+    flat vector illustration, thick bold outlines, simple geometric shapes,
+    limited warm palette, one clear subject, uncluttered plain background,
+    cinematic vertical composition, no text, no words, no letters, no watermark,
+    no user interface, no logos
+
+  # Empirical limits of the free tier (Nov 2026): model flux returns 402,
+  # sana works but is throttled so hard that ~1 in 5 requests succeeds. It is a
+  # fallback, not the default.
+  ai_backend: local_sd     # local_sd | pollinations
+  local_model: stabilityai/sdxl-turbo
+  local_steps: 2           # turbo checkpoints: guidance 0.0, 1-4 steps
+  ai_model: sana
+  # 512x768 is ~5.6s/image. 832x1216 hits an MPS memory cliff at ~110s/image,
+  # which is a 20x regression for 2.5x the pixels. Both axes must be /8.
+  ai_width: 512
+  ai_height: 768
+  ai_retries: 4
+  ai_backoff: 5
+  ai_timeout: 120
+
+  pexels_orientation: portrait
+  palette:
+    - "#0f0c29"
+    - "#302b63"
+    - "#24243e"
+    - "#1a1a2e"
+    - "#16213e"
+  fps: 30
+  width: 1080
+  height: 1920
+  crf: 20
+  preset: ultrafast        # per-scene b-roll; speed matters, quality does not
+  grain: false             # temporal noise costs ~3x encode time; off by default
+  final_preset: veryfast   # the one encode that ships
+  final_crf: 19
+
+# ---- audio ----------------------------------------------------------------------
+audio:
+  sample_rate: 48000
+  music_dir: assets/music
+  music_volume: 0.22
+  target_lufs: -16
+  duck: true
+  tail_pad: 0.30            # seconds of silence after each scene's last word
+
+# ---- output ---------------------------------------------------------------------
+paths:
+  work: work
+  out: out
+  db: work/reelforge.db
+
+# ---- publish --------------------------------------------------------------------
+publish:
+  youtube:
+    enabled: true
+    privacy: public          # public | unlisted | private
+    category_id: "27"        # 27 = Education, 28 = Science & Tech
+    made_for_kids: false
+  instagram:
+    enabled: true
+    share_to_feed: true
+    host: none               # none | r2 | gh_release
+  facebook:
+    enabled: true
+    video_state: PUBLISHED   # PUBLISHED | DRAFT

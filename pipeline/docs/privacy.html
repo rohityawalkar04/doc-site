@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacy Policy — Gita &amp; Grit</title>
+<meta name="description" content="How the Gita &amp; Grit publishing application accesses, stores and protects data.">
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; font:16px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+         background:#14121f; color:#ece9f5; }
+  main { max-width:680px; margin:0 auto; padding:64px 24px 96px; }
+  h1 { font-size:32px; margin:0 0 4px; letter-spacing:-.02em; }
+  h2 { font-size:18px; margin:36px 0 8px; color:#ffd84d; }
+  .updated { color:#8f89a8; font-size:14px; margin:0 0 32px; }
+  p, li { color:#c9c4dc; }
+  a { color:#ffd84d; }
+  ul, ol { padding-left:20px; }
+  table { border-collapse:collapse; width:100%; margin:12px 0; font-size:15px; }
+  th, td { text-align:left; padding:9px 10px; border-bottom:1px solid #2a2740;
+           color:#c9c4dc; vertical-align:top; }
+  th { color:#ece9f5; font-weight:600; }
+  code { background:#1c1930; padding:1px 5px; border-radius:4px; font-size:14px; }
+  footer { margin-top:56px; padding-top:24px; border-top:1px solid #2a2740;
+           font-size:14px; color:#8f89a8; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Privacy Policy</h1>
+  <p class="updated">Last updated: 15 November 2026</p>
+
+  <h2>1. Who we are</h2>
+  <p><strong>Gita &amp; Grit</strong> ("we", "us") operates a private
+  content-publishing application that creates original short videos about Hindu
+  mythology, folk tales and motivation, and uploads them to channels and Pages
+  that we own. This policy explains exactly what that application accesses, what
+  it stores, and what it does not do.</p>
+
+  <p>This policy applies to the application and to this website. It does not apply
+  to the platforms we publish to — YouTube, Instagram and Facebook each have their
+  own privacy policies governing content after it is uploaded.</p>
+
+  <h2>2. What data the application accesses</h2>
+  <p>The application uses official platform APIs with scopes we deliberately keep
+  to the minimum needed to publish our own videos:</p>
+
+  <table>
+    <thead>
+      <tr><th>Platform</th><th>Scope requested</th><th>What it allows</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>YouTube (Data API v3)</td>
+        <td><code>youtube.upload</code></td>
+        <td>Upload a video file to the authorised channel. No read access to
+            other channels, comments, subscribers or analytics.</td>
+      </tr>
+      <tr>
+        <td>Instagram (Graph API)</td>
+        <td><code>instagram_content_publish</code>,
+            <code>instagram_basic</code></td>
+        <td>Publish a Reel to the authorised professional account. Read the
+            account's own ID and username.</td>
+      </tr>
+      <tr>
+        <td>Facebook (Graph API)</td>
+        <td><code>pages_manage_posts</code>,
+            <code>pages_read_engagement</code>,
+            <code>pages_show_list</code>,
+            <code>publish_video</code></td>
+        <td>Publish a Reel to a Page we administer, and list the Pages we own so
+            we can select the correct one.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>We do not request messaging, advertising, audience-insight, follower-list or
+  comment-moderation permissions.</p>
+
+  <h2>3. What we store</h2>
+  <ul>
+    <li><strong>OAuth access and refresh tokens</strong> — stored as plain files on
+        the operator's own computer, in a directory readable only by that user.
+        These tokens authenticate our own uploads.</li>
+    <li><strong>Your own video files and generated images</strong> — stored locally
+        on the same computer until uploaded.</li>
+    <li><strong>Publication records</strong> — a local database noting which video
+        was published to which platform, and the returned post identifier. This
+        exists to prevent accidental duplicate posting.</li>
+  </ul>
+
+  <p>We operate no server and no database in the cloud. Nothing is transmitted to
+  us, because there is no "us" to transmit to — the application runs entirely on
+  the operator's machine.</p>
+
+  <h2>4. What we do not collect</h2>
+  <ul>
+    <li>We do not collect personal data about any viewer, subscriber or third party.</li>
+    <li>We do not access other users' accounts, videos, messages or analytics.</li>
+    <li>We do not use cookies, tracking pixels, fingerprinting or third-party
+        analytics on this website.</li>
+    <li>We do not sell, rent, trade or share data with anyone.</li>
+    <li>We do not use platform API data to train machine-learning models.</li>
+    <li>We do not serve advertising.</li>
+  </ul>
+
+  <h2>5. How we use the data</h2>
+  <p>Accessed data is used for exactly two purposes: to authenticate the upload of
+  a video we created, and to record where it was published so we do not publish it
+  twice. No secondary use, profiling or automated decision-making about any person
+  takes place.</p>
+
+  <h2>6. Legal basis</h2>
+  <p>Where data protection law requires a legal basis, we rely on our own consent
+  as the account owner — we authorise the application ourselves and can withdraw
+  that authorisation at any time. No third party's data is processed.</p>
+
+  <h2>7. Retention and deletion</h2>
+  <p>Tokens are retained until we revoke access or delete them. Local video files
+  are retained until we delete them. Publication records are retained for as long
+  as the channel operates, and can be deleted at any time by removing the local
+  database file. Revoking access in the platform settings immediately stops the
+  application from uploading.</p>
+
+  <h2>8. Sharing and third parties</h2>
+  <p>Video files are transmitted directly to YouTube and Meta for publication. That
+  is the only outbound transfer of data. Beyond that, we share data with nobody.
+  We do not use sub-processors, and we do not use a hosting provider for personal
+  data because no personal data leaves the operator's computer.</p>
+
+  <h2>9. Security</h2>
+  <p>Tokens are stored with file permissions restricting access to the operating
+  system user account. The computer is protected by a login password and disk
+  encryption. Tokens are never committed to version control; the repository that
+  contains this website contains no credentials of any kind.</p>
+
+  <h2>10. Your rights</h2>
+  <p>Because the application processes no third-party personal data, there is no
+  third-party data to access, correct, export or erase. As the account owner you
+  can revoke all access at any time:</p>
+  <ul>
+    <li>Google: <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a></li>
+    <li>Meta: <a href="https://www.facebook.com/settings?tab=applications">facebook.com/settings?tab=applications</a></li>
+  </ul>
+  <p>Revoking access takes effect immediately and stops all further uploads.</p>
+
+  <h2>11. International transfers</h2>
+  <p>We do not transfer data internationally, because we do not operate a server.
+  Uploads go directly from the operator's computer to the platform's own
+  infrastructure, under that platform's terms.</p>
+
+  <h2>12. Children</h2>
+  <p>The application is not directed at children and collects no data from anyone,
+  including children.</p>
+
+  <h2>13. Changes to this policy</h2>
+  <p>If this policy changes, the date at the top of this page is updated and the
+  revised policy takes effect when published. Material changes will be reflected
+  here before the application continues to be used.</p>
+
+  <h2>14. Contact</h2>
+  <p>Questions about this policy or the application:
+  <a href="mailto:gitaandgrit@gmail.com">gitaandgrit@gmail.com</a></p>
+
+  <footer>
+    Gita &amp; Grit ·
+    <a href="https://rohityawalkar04.github.io/gitaandgrit-site/">App information</a> ·
+    <a href="https://rohityawalkar04.github.io/gitaandgrit-site/terms.html">Terms of Service</a>
+  </footer>
+</main>
+</body>
+</html>

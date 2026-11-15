@@ -1,0 +1,9 @@
+# Site repo guard: credentials must never land here.
+.env
+.env.local
+secrets/
+*.pem
+*.p12
+*.key
+*.mp4
+*.db

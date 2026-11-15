@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Project-root entry point. Works even if the venv's .pth handling is broken.
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PYTHONPATH="$ROOT/src" exec "$ROOT/.venv/bin/python" -m reelforge.cli "$@"

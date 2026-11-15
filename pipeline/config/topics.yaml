@@ -1,0 +1,305 @@
+# Topic queue for the channel. One reel per entry, in order, never repeated
+# (tracked in work/reelforge.db).
+#
+# Beat entries use {n: narration, v: visual query}. The visual query drives the
+# AI illustration, so every scene gets its own subject instead of repeating the
+# topic title.
+#
+# `source` is appended to every caption. In this niche that is not optional:
+# it builds trust and it is search traffic.
+topics:
+- id: five-minute-rule
+  kind: motivation
+  title: The five-minute rule that ends procrastination
+  angle: 'Starting is the whole cost. Shrink the task until beginning is trivial, and almost nobody stops at five minutes.
+
+    '
+  beats:
+  - n: You do not have a discipline problem. You have a starting problem.
+    v: a person staring at a blank open notebook
+  - n: Motivation arrives after you begin, not before it.
+    v: a single match being struck in darkness
+  - n: So shrink the task until starting feels almost silly.
+    v: an enormous boulder beside a tiny pebble
+  - n: Set a timer for five minutes and do only that.
+    v: an hourglass on a wooden desk
+  - n: You are allowed to stop the moment it rings.
+    v: a hand pressing a stopwatch button
+  - n: Almost nobody stops, because starting was the whole cost.
+    v: an open door with warm light behind it
+  - n: It works because it removes the decision, not the work.
+    v: a single arrow painted on the ground pointing forward
+  - n: Do it today, on the thing you keep avoiding.
+    v: a calendar page with one square circled in red
+  - n: Five minutes is short enough to agree to and long enough to matter.
+    v: a large clock face with five minutes marked
+  - n: Start badly. Starting is the skill.
+    v: a rough pencil sketch on paper
+- id: stonecutter
+  kind: character
+  title: The stonecutter who stopped looking up
+  angle: 'A traditional tale: the stonecutter wishes to be the merchant, then the sun, then the cloud, then the mountain - and envies himself.
+
+    '
+  beats:
+  - n: A stonecutter wished he were a merchant.
+    v: a stonecutter holding a chisel and hammer
+  - n: As a merchant he envied the governor.
+    v: a merchant counting gold coins
+  - n: As governor he envied the sun, which nothing could shade.
+    v: a blazing sun above a palace
+  - n: As the sun he envied the cloud that covered him.
+    v: a single dark cloud crossing the sun
+  - n: As the cloud he envied the mountain that pierced him.
+    v: a tall sharp mountain peak
+  - n: As the mountain he envied the stonecutter, who cut through him.
+    v: a chisel striking grey rock
+  - n: So he became himself again and looked at his own hands.
+    v: two weathered hands holding a chisel
+  - n: Every version of himself wanted the next thing.
+    v: a row of mirrors each reflecting the one before
+  - n: The wanting did not move, whichever body carried it.
+    v: a still figure among blurred moving people
+  - n: You are already holding the chisel.
+    v: a hand gripping a chisel in golden light
+- id: sisyphus
+  kind: mythological
+  title: Sisyphus, and why the rock is not the punishment
+  angle: 'Camus''s reading: the punishment is only cruel while he looks for meaning beyond the struggle. Accepting the rock makes the push his own.
+
+    '
+  beats:
+  - n: The gods gave Sisyphus the cruellest punishment they could design.
+    v: an enormous round boulder on a steep hillside
+  - n: Push the boulder uphill. Watch it roll back. Repeat forever.
+    v: a boulder rolling down a rocky slope
+  - n: Camus said it is only cruel if he looks for a reason beyond it.
+    v: a lone small figure at the foot of a cliff
+  - n: The moment he accepts the rock, the struggle becomes his own.
+    v: two hands pressed flat against stone
+  - n: There is nothing to finish. There is only the pushing.
+    v: a straining silhouette against a pale sky
+  - n: That is not despair. That is the end of pretending.
+    v: a clear horizon emerging from fog
+  - n: Most of us push something we refuse to name.
+    v: a person carrying a heavy wooden box alone
+  - n: Name it, and the weight stops being a secret.
+    v: a single lantern glowing in the dark
+  - n: The rock does not get lighter. You stop resenting it.
+    v: a boulder with one hand resting on it
+  - n: One must imagine Sisyphus happy.
+    v: a figure standing tall on a summit at dawn
+- id: odysseus-mast
+  kind: mythological
+  title: Odysseus tied himself to the mast
+  angle: 'He did not trust willpower. He built a structure that would hold him, then let himself hear the song. Commitment devices are old.
+
+    '
+  beats:
+  - n: Odysseus knew the sirens would ruin him, so he planned around himself.
+    v: a wooden sailing ship with a tall mast
+  - n: He had his crew plug their ears with wax.
+    v: sailors rowing while holding lumps of wax
+  - n: Then he had them tie him to the mast, hands bound.
+    v: thick rope knotted around a wooden mast
+  - n: He wanted to hear the song. He did not trust himself to survive it.
+    v: a bound man against a mast with open eyes
+  - n: Willpower was never the plan. Structure was.
+    v: a ship wheel held steady by two hands
+  - n: You will not out-argue your own weakness when it arrives.
+    v: a dark storm building over the sea
+  - n: So decide now, while you are calm, what will hold you.
+    v: a deliberate knot being tied in rope
+  - n: Delete the app. Move the money. Tell someone the date.
+    v: a phone lying face down on a table
+  - n: Constraints you choose are kinder than regret you earn.
+    v: a small locked chest with a brass key
+  - n: Tie yourself to the mast before the singing starts.
+    v: a ship sailing toward distant jagged rocks
+- id: achilles-choice
+  kind: mythological
+  title: Achilles was offered two lives
+  angle: 'A long quiet forgotten life, or a short one spoken of forever. Every ambition is that same trade, made quietly and repeatedly.
+
+    '
+  beats:
+  - n: Achilles was offered two lives, and he chose the short one.
+    v: a bronze helmet and a spear laid on sand
+  - n: One was long, quiet, and forgotten.
+    v: a small stone house in a calm green valley
+  - n: The other was brief and spoken of forever.
+    v: a fast bright flame against a dark background
+  - n: He chose the flame. Not because it was wise.
+    v: a burning torch raised high at night
+  - n: Because he could not stand the quiet version of himself.
+    v: a figure sitting alone in deep shadow
+  - n: Every ambition is that trade, made quietly and repeatedly.
+    v: two paths splitting at a fork in the road
+  - n: You give up comfort, certainty, and being liked by everyone.
+    v: a hand setting down a folded soft blanket
+  - n: You are not owed the outcome. Only the choice.
+    v: a spear planted upright in dry earth
+  - n: Make it deliberately, or the quiet life will make it for you.
+    v: an untended path overgrown with tall grass
+  - n: Choose the flame, then stop mourning the valley.
+    v: a bright campfire in an open field at dusk
+- id: yaksha-prashna
+  kind: hindu
+  source: Mahabharata, Vana Parva (Yaksha Prashna)
+  title: The yaksha asked what the greatest wonder is
+  angle: Yudhishthira is stopped at a lake and must answer before he may drink. His answer to one question has outlived everyone in the story.
+  hashtags:
+  - '#shorts'
+  - '#hindumythology'
+  - '#mahabharata'
+  - '#motivation'
+  - '#wisdom'
+  beats:
+  - n: A yaksha stopped Yudhishthira at a lake and demanded answers.
+    v: a still dark lake in a forest with one kneeling figure
+  - n: His brothers lay dead beside it. He could not drink until he answered.
+    v: four fallen bows beside still water
+  - n: 'The question came: what is the greatest wonder in the world?'
+    v: a carved stone face half hidden in leaves
+  - n: 'He said: every day, beings are carried away to death.'
+    v: a slow line of lanterns moving through darkness
+  - n: And those who remain believe they will never be among them.
+    v: a warm crowded marketplace at evening
+  - n: That is the wonder. Not death. The belief that it skips us.
+    v: a single empty chair among many full ones
+  - n: Every plan you postpone lives inside that belief.
+    v: an unopened sealed letter on a table
+  - n: The yaksha restored his brothers, because honesty was the price.
+    v: still water turning clear and bright
+  - n: The riddle was never the test. The answering was.
+    v: a man standing tall at a lake edge at dawn
+  - n: Say the true thing about your own time today.
+    v: a hand closing a pocket watch
+- id: ekalavya
+  kind: hindu
+  source: Mahabharata, Adi Parva (Ekalavya)
+  title: Ekalavya was refused a teacher, so he built one
+  angle: Denied by Drona, he taught himself before a clay image. When his skill surpassed the princes, the fee for it was his thumb.
+  hashtags:
+  - '#shorts'
+  - '#hindumythology'
+  - '#mahabharata'
+  - '#dedication'
+  - '#motivation'
+  beats:
+  - n: Ekalavya wanted Drona as his teacher. Drona refused him.
+    v: a young archer standing at the edge of a forest
+  - n: So he built a clay image of Drona and taught himself.
+    v: a hand built clay figure in a forest clearing
+  - n: He practised alone, in the dark, until his aim beat the princes.
+    v: arrows in flight against a dark treeline
+  - n: Then the royal teacher saw what a boy with no teacher had done.
+    v: evenly placed arrows in a dusty path
+  - n: Drona asked for his guru dakshina, the fee owed to a teacher.
+    v: an old teacher holding out an open palm
+  - n: The fee was his right thumb.
+    v: a bow held by a hand with the thumb raised
+  - n: Without it, he could never shoot the same way again.
+    v: a bowstring going slack
+  - n: Ekalavya cut it off and gave it, without argument.
+    v: a small blade resting on flat stone
+  - n: Then he went back and kept practising with what he had left.
+    v: a hand drawing a bow with fewer fingers
+  - n: Devotion that survives the price is the only kind that was real.
+    v: a lone archer silhouetted at sunrise
+- id: karnas-armour
+  kind: hindu
+  source: Mahabharata (Karna and Indra's boon)
+  title: Karna gave away the armour he was born in
+  angle: His golden armour made him unkillable. Indra came disguised as a brahmin and asked for it, and Karna gave it knowing the cost.
+  hashtags:
+  - '#shorts'
+  - '#hindumythology'
+  - '#mahabharata'
+  - '#karna'
+  - '#generosity'
+  beats:
+  - n: Karna was born wearing golden armour and earrings.
+    v: a figure with gold armour glowing at dawn
+  - n: It was not decoration. It was the reason he could not be killed.
+    v: close view of golden chest armour
+  - n: Indra came disguised as a brahmin and asked for them.
+    v: a robed traveller with a staff at a doorway
+  - n: Karna knew who he was. He gave them anyway.
+    v: a hand reaching to remove a golden earring
+  - n: He cut them from his own body and handed them over.
+    v: a bright golden object resting in an open palm
+  - n: The brahmin revealed himself and granted a single boon.
+    v: a glowing spear held out in offering
+  - n: It did not save him. He understood that when he agreed.
+    v: a broken chariot wheel sunk in mud
+  - n: He had been told his whole life that he did not belong.
+    v: a lone figure outside a brightly lit hall
+  - n: So he gave away the only thing that made him safe.
+    v: empty golden armour resting on the ground
+  - n: Generosity that costs nothing was never generosity.
+    v: an open empty hand in warm light
+- id: nachiketa
+  kind: hindu
+  source: Katha Upanishad (Nachiketa)
+  title: Nachiketa refused every gift and asked one question
+  angle: A boy is sent to the house of Death by his father's anger. Granted three boons, he spends the last on the only question that matters.
+  hashtags:
+  - '#shorts'
+  - '#hindumythology'
+  - '#upanishads'
+  - '#motivation'
+  - '#wisdom'
+  beats:
+  - n: Nachiketa's father gave away everything he owned in a ritual.
+    v: a fire altar with offerings beside a river
+  - n: 'The boy asked him: to whom will you give me?'
+    v: a small boy standing before a tall fire
+  - n: 'Angered, his father said: I give you to Death.'
+    v: an old man with an outstretched arm
+  - n: So Nachiketa walked to the house of Yama.
+    v: a dark doorway lit by a single lamp
+  - n: Yama was away. He waited three nights without food.
+    v: a boy sitting alone in an empty stone hall
+  - n: Yama returned and offered him three boons.
+    v: a seated figure in shadow on a throne
+  - n: For the third, the boy asked what happens after death.
+    v: a single steady flame in darkness
+  - n: Yama offered gold, sons, and long life. The boy refused it all.
+    v: a pile of gold pushed aside on a floor
+  - n: He wanted the truth more than he wanted comfort.
+    v: a boy sitting straight with a steady gaze
+  - n: The one thing worth asking for is the thing you cannot be given.
+    v: a lamp burning steadily on cold stone
+- id: hanumans-strength
+  kind: hindu
+  source: Ramayana, Kishkindha Kanda
+  title: Hanuman forgot what he was capable of
+  angle: His strength was never taken. It was hidden from him, until someone simply told him what he already was.
+  hashtags:
+  - '#shorts'
+  - '#hindumythology'
+  - '#ramayana'
+  - '#hanuman'
+  - '#motivation'
+  beats:
+  - n: As a child, Hanuman leapt for the sun because it looked like fruit.
+    v: a small figure leaping toward an enormous sun
+  - n: He was struck down, and afterwards his strength was hidden from him.
+    v: a child lying still among soft clouds
+  - n: Years later, an army needed one impossible leap across the sea.
+    v: a vast ocean with a distant coastline
+  - n: Everyone stood at the shore. Nobody could cross.
+    v: small figures standing at the edge of the sea
+  - n: Then Jambavan turned to Hanuman and told him what he was.
+    v: an old bear standing beside a younger figure
+  - n: You were never weak, he said. You forgot.
+    v: a hand resting on a shoulder
+  - n: Hanuman grew, and the water beneath him became small.
+    v: a growing silhouette above the waves
+  - n: He crossed because someone reminded him, not because he changed.
+    v: a figure in flight over open sea
+  - n: Most of what you call a limit is an unwatched memory.
+    v: a stone wall with a gate slightly open
+  - n: Ask someone today what you are actually capable of.
+    v: two figures talking at sunset on a shore

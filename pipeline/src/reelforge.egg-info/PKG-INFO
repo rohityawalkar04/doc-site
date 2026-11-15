@@ -1,0 +1,17 @@
+Metadata-Version: 2.4
+Name: reelforge
+Version: 0.1.0
+Summary: Faceless short-form video factory: script, voice, captions, render, publish.
+Requires-Python: >=3.10
+Requires-Dist: edge-tts>=6.1.9
+Requires-Dist: requests>=2.31
+Requires-Dist: PyYAML>=6.0
+Requires-Dist: python-dotenv>=1.0
+Requires-Dist: Pillow>=10.0
+Requires-Dist: google-api-python-client>=2.100
+Requires-Dist: google-auth-oauthlib>=1.1
+Requires-Dist: google-auth-httplib2>=0.1.1
+Requires-Dist: boto3>=1.34
+Provides-Extra: kokoro
+Requires-Dist: kokoro>=0.9; extra == "kokoro"
+Requires-Dist: soundfile>=0.12; extra == "kokoro"
