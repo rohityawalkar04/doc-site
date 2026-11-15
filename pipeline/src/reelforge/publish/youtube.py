@@ -13,6 +13,7 @@ Two traps worth knowing:
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
@@ -34,6 +35,20 @@ def _service(cfg):
     if creds and creds.expired and creds.refresh_token:
         creds.refresh(Request())
     if not creds or not creds.valid:
+        # run_local_server() waits for a browser callback. In CI there is no
+        # browser and no TTY, so it would block until the job timeout (45 min)
+        # and report nothing useful. Refuse instead.
+        interactive = sys.stdin.isatty() and not (
+            os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS")
+        )
+        if not interactive:
+            raise RuntimeError(
+                "no usable YouTube token, and this is a non-interactive run.\n"
+                "  Authorise once on your own machine:\n"
+                "    ./reelforge publish <reel_id> --platforms youtube --yes\n"
+                "  Then copy the whole contents of secrets/yt_token.json into the\n"
+                "  YT_TOKEN_JSON repository secret (Settings > Secrets > Actions)."
+            )
         if not secret.exists():
             raise RuntimeError(
                 f"missing OAuth client secret at {secret}\n"
