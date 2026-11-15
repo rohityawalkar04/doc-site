@@ -145,7 +145,12 @@ def main() -> int:
         return 0
 
     store = state.Store(cfg.db)
-    for topic in topics[: args.count]:
+    # count 0 means "work through the whole queue": the loop stops on its own at
+    # the platform's daily cap, so there is no point guessing a number up front.
+    batch = topics if args.count == 0 else topics[: args.count]
+
+    stopped_by_cap = False
+    for topic in batch:
         print(f"\n=== {topic['id']} ===", flush=True)
         meta = pipeline.build(cfg, store, topic, keep_work=False)
         reel_id = meta["reel_id"]
@@ -167,6 +172,18 @@ def main() -> int:
         # publish() writes the ledger itself; nothing to do here on success.
         for platform, err in failures.items():
             print(f"::warning title={platform} failed::{err[:300]}")
+
+        # The channel cap is a daily boundary, not a fault. Retrying the next reel
+        # would hit the same wall and waste API calls, so stop the whole batch and
+        # leave the rest queued. The topic is not in the ledger, so nothing is lost
+        # and tomorrow's run picks it up.
+        if any("CHANNEL upload limit" in str(v) for v in failures.values()):
+            stopped_by_cap = True
+            print("::warning title=Daily upload cap reached::"
+                  f"YouTube channel limit hit after {len(ledger.load())} published; "
+                  f"{len(batch) - batch.index(topic) - 1} reel(s) left queued for tomorrow.")
+            break
+        failed += 1
 
     print(f"\nledger now holds {len(ledger.load())} published topic(s)")
     return 0

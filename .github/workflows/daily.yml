@@ -21,7 +21,7 @@ on:
           - dry-run
         default: publish
       count:
-        description: "how many reels to build"
+        description: "how many reels; 0 = work through the whole queue until the daily cap"
         default: "1"
 
 permissions:
