@@ -25,6 +25,7 @@ STDLIB = {
     "dataclasses", "datetime", "enum", "functools", "getpass", "hashlib", "html",
     "itertools", "json", "math", "os", "pathlib", "random", "re", "shutil",
     "sqlite3", "subprocess", "sys", "textwrap", "time", "typing", "urllib",
+    "wave", "io", "tempfile", "struct", "unicodedata", "traceback",
 }
 
 # import name -> distribution name, where the two differ.
@@ -39,6 +40,7 @@ DIST = {
     "google": "google-api-python-client",
     "boto3": "boto3",
     "requests": "requests",
+    "piper": "piper-tts",
 }
 
 # Lazy imports for optional backends. Deliberately not in requirements.txt:

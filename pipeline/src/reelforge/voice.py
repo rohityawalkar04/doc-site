@@ -17,6 +17,7 @@ import time
 from pathlib import Path
 
 import edge_tts
+import requests
 
 RETRIES = 6
 SCENE_GAP = 0.45  # the endpoint rate-limits hard; a small gap is cheaper than a retry
@@ -45,18 +46,95 @@ async def _edge_once(text: str, voice: str, rate: str, pitch: str, out_path: Pat
 
 
 def _even_words(text: str, seconds: float) -> list[dict]:
-    """No boundaries returned: spread words across the real duration.
+    """No boundaries available: distribute words by character length.
 
-    Captions stay readable and roughly in sync, which beats failing the reel.
+    Equal spacing drifts on real speech because "the" and "understanding" are not
+    the same length. Weighting by character count tracks the audio closely enough
+    that caption cards land on the right phrase.
     """
     toks = [t for t in text.split() if t]
     if not toks:
         return []
-    step = (seconds * 0.96) / len(toks)
-    return [
-        {"w": t, "start": round(0.02 + i * step, 4), "end": round(0.02 + (i + 1) * step, 4)}
-        for i, t in enumerate(toks)
-    ]
+    weights = [len(t) + 1 for t in toks]
+    total = float(sum(weights))
+    usable = seconds * 0.96
+    out: list[dict] = []
+    t = 0.02
+    for tok, w in zip(toks, weights):
+        d = usable * w / total
+        out.append({"w": tok, "start": round(t, 4), "end": round(t + d, 4)})
+        t += d
+    return out
+
+
+# --------------------------------------------------------------------- piper
+PIPER_BASE = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ryan/high/en_US-ryan-high.onnx"
+_PIPER: dict[str, object] = {}
+
+
+def ensure_piper_model(cfg) -> Path:
+    """Fetch the voice once per machine. CI has no cache, so this runs each time."""
+    model = cfg.path(cfg.get("voice.piper_model", "assets/piper/en_US-ryan-high.onnx"))
+    if model.exists():
+        return model
+    model.parent.mkdir(parents=True, exist_ok=True)
+    for suffix in ("", ".json"):
+        url = PIPER_BASE + suffix
+        dest = Path(str(model) + suffix)
+        print(f"      downloading piper voice {url.rsplit('/', 1)[-1]} ...", flush=True)
+        with requests.get(url, stream=True, timeout=300) as r:
+            r.raise_for_status()
+            with open(dest, "wb") as f:
+                for chunk in r.iter_content(1 << 16):
+                    f.write(chunk)
+    return model
+
+
+def _piper_scene(text: str, model: Path, out_path: Path) -> list[dict]:
+    """Local CPU speech. MIT licensed, offline, no rate limit - the CI-safe engine."""
+    import wave
+
+    from piper import PiperVoice
+
+    key = str(model)
+    if key not in _PIPER:
+        _PIPER[key] = PiperVoice.load(key)
+    voice = _PIPER[key]
+
+    with wave.open(str(out_path), "wb") as wf:
+        voice.synthesize_wav(text, wf)
+    with wave.open(str(out_path)) as rd:
+        seconds = rd.getnframes() / rd.getframerate()
+    return _even_words(text, seconds)
+
+
+def synthesise(cfg, scenes: list[dict], audio_dir: Path) -> list[dict]:
+    """Writes one audio file per scene. Returns scenes with audio_path + words."""
+    audio_dir.mkdir(parents=True, exist_ok=True)
+    engine = cfg.get("voice.engine", "edge")
+    voice = cfg.get("voice.name", "en-US-AndrewNeural")
+    rate = cfg.get("voice.rate", "+0%")
+    pitch = cfg.get("voice.pitch", "+0Hz")
+    piper_model = ensure_piper_model(cfg) if engine == "piper" else None
+
+    out: list[dict] = []
+    total = len(scenes)
+    for i, scene in enumerate(scenes, 1):
+        print(f"  [{i}/{total}] voice ({engine}) ...", flush=True)
+        if engine == "piper":
+            path = audio_dir / f"scene_{i:02d}.wav"
+            words = _piper_scene(scene["narration"], piper_model, path)
+        elif engine == "kokoro":
+            path = audio_dir / f"scene_{i:02d}.wav"
+            words = _kokoro_scene(scene["narration"], cfg.get("voice.kokoro_voice", "af_heart"), path)
+        else:
+            path = audio_dir / f"scene_{i:02d}.mp3"
+            words = asyncio.run(_edge_scene(scene["narration"], voice, rate, pitch, path))
+            if not words:
+                words = _even_words(scene["narration"], duration(path))
+            time.sleep(SCENE_GAP)
+        out.append({**scene, "audio_path": str(path), "words": words})
+    return out
 
 
 async def _edge_scene(text: str, voice: str, rate: str, pitch: str, out_path: Path) -> list[dict]:
@@ -107,31 +185,6 @@ def _kokoro_scene(text: str, voice: str, out_path: Path) -> list[dict]:
         {"w": t, "start": round(i * step, 4), "end": round((i + 1) * step, 4)}
         for i, t in enumerate(toks)
     ]
-
-
-def synthesise(cfg, scenes: list[dict], audio_dir: Path) -> list[dict]:
-    """Writes one audio file per scene. Returns scenes with audio_path + words."""
-    audio_dir.mkdir(parents=True, exist_ok=True)
-    engine = cfg.get("voice.engine", "edge")
-    voice = cfg.get("voice.name", "en-US-AndrewNeural")
-    rate = cfg.get("voice.rate", "+0%")
-    pitch = cfg.get("voice.pitch", "+0Hz")
-
-    out: list[dict] = []
-    total = len(scenes)
-    for i, scene in enumerate(scenes, 1):
-        print(f"  [{i}/{total}] voice ({engine}) ...", flush=True)
-        if engine == "kokoro":
-            path = audio_dir / f"scene_{i:02d}.wav"
-            words = _kokoro_scene(scene["narration"], cfg.get("voice.kokoro_voice", "af_heart"), path)
-        else:
-            path = audio_dir / f"scene_{i:02d}.mp3"
-            words = asyncio.run(_edge_scene(scene["narration"], voice, rate, pitch, path))
-            if not words:
-                words = _even_words(scene["narration"], duration(path))
-            time.sleep(SCENE_GAP)
-        out.append({**scene, "audio_path": str(path), "words": words})
-    return out
 
 
 def duration(path: str | Path) -> float:

@@ -10,3 +10,7 @@ secrets/
 *.log
 __pycache__/
 .DS_Store
+
+# piper voice model: 115 MB, downloaded on demand
+assets/piper/*.onnx
+assets/piper/*.onnx.json

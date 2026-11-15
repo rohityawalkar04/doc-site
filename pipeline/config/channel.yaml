@@ -32,8 +32,13 @@ script:
 #                  licensed for commercial reuse. Fine for testing.
 # engine: kokoro -> Apache-2.0 local model, clean rights. Requires `pip install kokoro soundfile`.
 voice:
-  engine: edge
-  name: en-US-AndrewNeural    # matches the one live video; neutral for a global audience
+  # piper: local CPU, MIT-licensed, offline, no rate limit. Chosen because
+  # edge-tts is throttled hard from cloud IPs (GitHub runners fail after ~5
+  # scenes) and has no clear commercial licence.
+  # edge: better sounding, but unreliable unattended and licence unclear.
+  engine: piper
+  piper_model: assets/piper/en_US-ryan-high.onnx
+  name: en-US-AndrewNeural    # only used when engine: edge
   rate: "+0%"              # +8% shaved ~8% off duration; natural pace clears 30s
   pitch: "+0Hz"
   kokoro_voice: af_heart
