@@ -49,6 +49,35 @@ def preflight(cfg) -> list[str]:
     if not token.exists():
         problems.append(f"YouTube token missing at {token} - run a local publish once to authorise")
         return problems
+    raw = token.read_text().strip()
+    if not raw:
+        problems.append(
+            f"{token} is EMPTY.\n"
+            "     The YT_TOKEN_JSON repository secret is not set (or is blank).\n"
+            "     Value to paste: the entire contents of secrets/yt_token.json on your machine.\n"
+            "     Settings > Secrets and variables > Actions > New repository secret"
+        )
+        return problems
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        problems.append(
+            f"{token} is not valid JSON (starts with {raw[:40]!r}).\n"
+            "     The secret must be the WHOLE json file, braces included - not just the\n"
+            "     refresh_token string, and not a copy that lost its newlines."
+        )
+        return problems
+    if not data.get("refresh_token"):
+        problems.append(
+            f"{token} has no refresh_token. Copy the entire file produced by a local\n"
+            "     ./reelforge publish <reel> --platforms youtube --yes"
+        )
+        return problems
+    if not cfg.path(os.environ.get("YT_CLIENT_SECRET", "secrets/yt_client_secret.json")).exists():
+        problems.append(
+            "YT_CLIENT_SECRET_JSON secret is not set - the OAuth client JSON is needed\n"
+            "     to refresh the token."
+        )
     try:
         creds = Credentials.from_authorized_user_file(str(token), SCOPES)
         if not creds.valid:
