@@ -134,9 +134,11 @@ publish:
     category_id: "27"        # 27 = Education, 28 = Science & Tech
     made_for_kids: false
   instagram:
-    enabled: true
+    # Off until IG_USER_ID / IG_ACCESS_TOKEN exist in CI. Otherwise every daily
+    # run attempts it, fails, and marks the run red even though YouTube posted.
+    enabled: false
     share_to_feed: true
     host: none               # none | r2 | gh_release
   facebook:
-    enabled: true
+    enabled: false
     video_state: PUBLISHED   # PUBLISHED | DRAFT
