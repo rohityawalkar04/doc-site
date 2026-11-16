@@ -197,7 +197,7 @@ def main() -> int:
             stopped_by_cap = True
             print("::warning title=Daily upload cap reached::"
                   f"YouTube channel limit hit after {len(ledger.load())} published; "
-                  f"{len(batch) - batch.index(topic) - 1} reel(s) left queued for tomorrow.")
+                  f"{len(topics) - topics.index(topic)} reel(s) still queued.")
             break
         failed += 1
 

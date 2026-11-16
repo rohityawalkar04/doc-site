@@ -16,8 +16,14 @@ on:
     # second exits immediately.
     #
     # Minutes are deliberately off :00 and :30.
+    # Three attempts, because the channel cap's reset is not as predictable as
+    # the API quota's. Midnight Pacific is the documented boundary, but on
+    # 16 Nov the cap still held an hour after it - consistent with a rolling
+    # 24-hour window measured from the last upload instead. The late slot
+    # covers that case.
     - cron: "17 8 * * *"      # 13:47 IST
     - cron: "17 11 * * *"     # 16:47 IST
+    - cron: "17 18 * * *"     # 23:47 IST
   workflow_dispatch:
     inputs:
       mode:
