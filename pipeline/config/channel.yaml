@@ -104,18 +104,24 @@ visuals:
   ai_timeout: 120
 
   pexels_orientation: portrait
+  # Only used by the procedural fallback. Warm charcoal rather than navy, so a
+  # degraded scene at least stays in the channel's palette (white captions need
+  # a dark ground to read against).
   palette:
-    - "#0f0c29"
-    - "#302b63"
-    - "#24243e"
-    - "#1a1a2e"
-    - "#16213e"
+    - "#1a1512"
+    - "#2e2318"
+    - "#241c16"
+    - "#1f1814"
+    - "#332619"
   fps: 30
   width: 1080
   height: 1920
   crf: 20
   preset: ultrafast        # per-scene b-roll; speed matters, quality does not
   grain: false             # temporal noise costs ~3x encode time; off by default
+  # Refuse to build if more than this many scenes fall back to gradients. One
+  # degraded scene among twelve is tolerable; thirteen is a different channel.
+  max_procedural: 1
   zoom_rate: 0.0024        # punchier than the original 0.0016
   zoom_max: 1.34
   final_preset: veryfast   # the one encode that ships
