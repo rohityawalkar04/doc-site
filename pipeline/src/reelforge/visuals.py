@@ -24,6 +24,15 @@ PEXELS_VIDEO = "https://api.pexels.com/videos/search"
 PEXELS_PHOTO = "https://api.pexels.com/v1/search"
 POLLINATIONS = "https://image.pollinations.ai/prompt/{prompt}"
 
+
+class AiQuotaExhausted(RuntimeError):
+    """Raised when the image backend has no allocation left.
+
+    Deliberately fatal: carrying on fills the reel with gradient placeholders,
+    which wastes the whole run and looks broken on a channel that publishes
+    illustrations.
+    """
+
 # Zoom/pan variants, cycled per scene. A reel where every shot pushes in at the
 # same speed reads as static even though it is moving.
 MOTIONS = ("in", "out", "left", "right", "in", "out")
@@ -398,6 +407,13 @@ def _gen_cloudflare(cfg, prompt: str, seed: int, dest: Path) -> Path | None:
         except ValueError:
             msg = r.text[:180]
         nsfw = "NSFW" in msg or "8007" in msg
+        if "free allocation" in msg or "upgrade to Cloudflare" in msg:
+            raise AiQuotaExhausted(
+                "Cloudflare Workers AI daily allocation exhausted (10,000 neurons).\n"
+                "  Resets at 00:00 UTC = 05:30 IST.\n"
+                "  Builds are the cost: every run regenerates all 13 images unless the\n"
+                "  cache is warm, so repeated rebuilds burn the day's allowance."
+            )
         print(f"    ! cloudflare {r.status_code} (attempt {attempt}/{len(attempts)})"
               f"{' - safety filter' if nsfw else ''}: {msg}")
         if r.status_code == 429 or r.status_code >= 500:

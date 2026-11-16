@@ -23,6 +23,7 @@ sys.path.insert(0, str(ROOT / "src"))
 os.environ.setdefault("REELFORGE_ROOT", str(ROOT))
 
 from reelforge import config, ledger, pipeline, state  # noqa: E402
+from reelforge.visuals import AiQuotaExhausted  # noqa: E402
 
 # CI captures stdout, so Python block-buffers it and progress appears in
 # 8KB lumps - which looks exactly like a hang.
@@ -171,7 +172,14 @@ def main() -> int:
     stopped_by_cap = False
     for topic in batch:
         print(f"\n=== {topic['id']} ===", flush=True)
-        meta = pipeline.build(cfg, store, topic, keep_work=False)
+        try:
+            meta = pipeline.build(cfg, store, topic, keep_work=False)
+        except AiQuotaExhausted as e:
+            # Stop here rather than caching a beautiful script with gradient art.
+            for line in str(e).splitlines():
+                print(line)
+            print("::error title=Image quota exhausted::" + str(e).splitlines()[0])
+            return 1
         reel_id = meta["reel_id"]
 
         if args.build_only:

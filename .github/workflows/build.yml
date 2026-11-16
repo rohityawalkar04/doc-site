@@ -72,6 +72,18 @@ jobs:
           path: pipeline/assets/piper
           key: piper-en_US-ryan-high-v1
 
+      # Image generations are the expensive resource: 13 per reel, and a rebuild
+      # of the same script produces identical seeds, so a warm cache makes
+      # rebuilds free. This matters because the free allocation is 10,000
+      # neurons/day and a cold build costs ~600 of it.
+      - name: Cache generated illustrations
+        uses: actions/cache@v4
+        with:
+          path: pipeline/assets/cache/ai
+          key: ai-${{ hashFiles('pipeline/config/topics.yaml') }}
+          restore-keys: |
+            ai-
+
       - name: Check required secrets are present
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
