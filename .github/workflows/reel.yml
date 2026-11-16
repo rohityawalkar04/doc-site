@@ -1,29 +1,21 @@
-name: publish
+name: reel
 
-# Stage 2 of 2. Uploads a reel that a `build` run already produced.
+# Build one reel, publish it, then the next, then the next - and stop dead at the
+# first failure. No half-finished state, no retrying into a broken condition.
 #
-# Nothing is generated here. It downloads the artifact from the run you name,
-# uploads it, and records the topic so it is never built or posted twice.
-#
-# That manual step is the point: a generated script and thirteen generated
-# illustrations should not reach a public channel unseen.
+# Runs every evening inside the 19:00-20:00 IST posting window.
 
 on:
+  schedule:
+    # 13:37 UTC = 19:07 IST. Inside the window, early enough that a single reel
+    # finishes well before 20:00. :37 rather than :00/:30 because GitHub's
+    # scheduler is worst at the top of the hour and can drop runs under load.
+    - cron: "37 13 * * *"
   workflow_dispatch:
     inputs:
-      run_id:
-        description: "build run id (Actions > build > the run; the URL ends with it)"
-        required: true
-      platforms:
-        description: "where to post"
-        type: choice
-        options:
-          - youtube
-          - instagram
-          - facebook
-          - youtube,facebook
-          - all
-        default: youtube
+      count:
+        description: "how many reels; 0 = keep going until something fails"
+        default: "0"
       mode:
         description: "publish, or rehearse without uploading"
         type: choice
@@ -33,38 +25,29 @@ on:
         default: publish
 
 permissions:
-  contents: write             # commit the ledger after a successful post
+  contents: write              # commit the ledger after each publish
 
 concurrency:
-  group: publish
+  group: reel
   cancel-in-progress: false
 
 jobs:
-  publish:
+  reel:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: pipeline
     steps:
       - uses: actions/checkout@v4
 
+      # actions/checkout pins the commit that TRIGGERED this run. Read the ledger
+      # from origin so a reel published since then is not built again.
       - name: Refresh the published ledger from main
         run: |
           git fetch --depth=1 origin main
           git show origin/main:pipeline/state/published.json > state/published.json
           python3 -c "import json;print('ledger entries:', len(json.load(open('state/published.json'))['published']))"
-
-      - name: Fetch the built reel from that run
-        uses: actions/download-artifact@v4
-        with:
-          name: reels
-          run-id: ${{ github.event.inputs.run_id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: pipeline/out
-
-      - name: Show what was downloaded
-        run: ls -lh out/
 
       - uses: actions/setup-python@v5
         with:
@@ -78,20 +61,53 @@ jobs:
       - name: Install Python dependencies
         run: pip install --quiet -r requirements.txt
 
+      - name: Verify dependencies and imports
+        env:
+          PYTHONPATH: src
+        run: |
+          python scripts/check_deps.py
+          python -c "
+          import reelforge.cli, reelforge.pipeline, reelforge.captions_png
+          import reelforge.visuals, reelforge.render, reelforge.voice
+          import reelforge.llm, reelforge.meta, reelforge.publish
+          print('imports OK')
+          "
+
+      - name: Cache piper voice
+        uses: actions/cache@v4
+        with:
+          path: pipeline/assets/piper
+          key: piper-en_US-ryan-high-v1
+
+      # 13 images per reel is the expensive part (~600 neurons) and a rebuild of
+      # the same script produces identical seeds, so a warm cache makes retries
+      # free. The free allocation is 10,000 neurons/day.
+      - name: Cache generated illustrations
+        uses: actions/cache@v4
+        with:
+          path: pipeline/assets/cache/ai
+          key: ai-${{ hashFiles('pipeline/config/topics.yaml') }}
+          restore-keys: |
+            ai-
+
       - name: Check required secrets are present
         env:
           YT_CLIENT_SECRET_JSON: ${{ secrets.YT_CLIENT_SECRET_JSON }}
           YT_TOKEN_JSON: ${{ secrets.YT_TOKEN_JSON }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           missing=""
           if [ -z "$YT_CLIENT_SECRET_JSON" ]; then missing="$missing YT_CLIENT_SECRET_JSON"; fi
           if [ -z "$YT_TOKEN_JSON" ];        then missing="$missing YT_TOKEN_JSON"; fi
+          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then missing="$missing CLOUDFLARE_ACCOUNT_ID"; fi
+          if [ -z "$CLOUDFLARE_API_TOKEN" ];  then missing="$missing CLOUDFLARE_API_TOKEN"; fi
           if [ -n "$missing" ]; then
             echo "::error title=Missing repository secrets::Not set:$missing"
-            echo "  YT_TOKEN_JSON = the ENTIRE contents of secrets/yt_token.json on your machine"
+            echo "Settings > Secrets and variables > Actions > New repository secret"
             exit 1
           fi
-          echo "youtube secrets present"
+          echo "required secrets present"
 
       - name: Materialise credentials
         env:
@@ -101,6 +117,8 @@ jobs:
           IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
           FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
           FB_PAGE_TOKEN: ${{ secrets.FB_PAGE_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           mkdir -p secrets
           printf '%s' "$YT_CLIENT_SECRET_JSON" > secrets/yt_client_secret.json
@@ -111,21 +129,25 @@ jobs:
             echo "IG_ACCESS_TOKEN=$IG_ACCESS_TOKEN"
             echo "FB_PAGE_ID=$FB_PAGE_ID"
             echo "FB_PAGE_TOKEN=$FB_PAGE_TOKEN"
+            echo "CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID"
+            echo "CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN"
             echo "IG_HOST=gh_release"
             echo "GH_RELEASE_REPO=${{ github.repository }}"
           } > .env
           chmod 600 .env secrets/*
 
-      - name: Publish
+      - name: Build and publish, one at a time
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AI_BACKEND: cloudflare
           PYTHONUNBUFFERED: "1"
         run: |
-          PYTHONPATH=src python -u scripts/publish_run.py \
-            --dir out \
-            --platforms "${{ github.event.inputs.platforms }}" \
+          PYTHONPATH=src python -u scripts/cloud_run.py \
+            --count "${{ github.event.inputs.count || '0' }}" \
             ${{ github.event.inputs.mode == 'dry-run' && '--dry-run' || '' }}
 
+      # Runs even on failure: a reel published before the error must still be
+      # recorded, or the next run would build it again.
       - name: Record what was published
         if: always()
         run: |
@@ -137,8 +159,6 @@ jobs:
             exit 0
           fi
           git commit -m "chore: record published reel [skip ci]"
-          # If this push fails the reel is live but unrecorded, and the next
-          # build would make it again. Retry, then fail loudly.
           for attempt in 1 2 3; do
             git pull --rebase --autostash origin main >/dev/null 2>&1 || true
             if git push; then echo "ledger pushed (attempt $attempt)"; exit 0; fi
@@ -146,3 +166,14 @@ jobs:
           done
           echo "::error title=Ledger NOT recorded::push failed after 3 attempts. Add the topic_id to state/published.json by hand."
           exit 1
+
+      - name: Upload the renders for inspection
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reels
+          path: |
+            pipeline/out/*.mp4
+            pipeline/out/*.json
+          if-no-files-found: ignore
+          retention-days: 14

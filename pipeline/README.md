@@ -292,15 +292,20 @@ card, no machine at home.
    | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` | Cloudflare dashboard |
    | `IG_USER_ID`, `IG_ACCESS_TOKEN`, `FB_PAGE_ID`, `FB_PAGE_TOKEN` | `scripts/meta_setup.py` |
 
-3. **Two stages, deliberately:**
-   - **Actions → build → Run workflow** builds a reel and attaches it as the
-     `reels` artifact. It publishes nothing and cannot even write the ledger
-     (`permissions: contents: read`).
-   - Download the artifact, watch it. Happy? **Actions → publish → Run workflow**,
-     paste the build run's id, pick a platform. That is the only step that posts.
-4. Build runs daily at `37 13 * * *` = **19:07 IST**, inside the evening posting
-   window and early enough that review + publish still land before 20:00.
-   Publishing never runs on a schedule.
+3. **One flow, sequential and fail-fast.** The `reel` workflow builds a reel,
+   publishes it, then takes the next, and stops dead at the first failure:
+
+   ```
+   build announcing-the-plan  -> publish  LOST
+   STOPPED after 10 published. 11 reel(s) still queued.
+   ```
+
+   `count` defaults to `0` = keep going until something fails. Set `count: 1` to
+   publish a single episode. The topic that failed stays out of the ledger, so
+   the next run retries it — no duplicates, no lost work.
+4. Runs daily at `37 13 * * *` = **19:07 IST**, inside the evening posting
+   window. `:37` because GitHub's scheduler is worst at the top of the hour and
+   can drop runs entirely under load.
 
 ### What changes in the cloud
 

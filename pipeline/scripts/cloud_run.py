@@ -169,16 +169,18 @@ def main() -> int:
     # the platform's daily cap, so there is no point guessing a number up front.
     batch = topics if args.count == 0 else topics[: args.count]
 
-    stopped_by_cap = False
     for topic in batch:
         print(f"\n=== {topic['id']} ===", flush=True)
         try:
             meta = pipeline.build(cfg, store, topic, keep_work=False)
         except AiQuotaExhausted as e:
-            # Stop here rather than caching a beautiful script with gradient art.
             for line in str(e).splitlines():
                 print(line)
             print("::error title=Image quota exhausted::" + str(e).splitlines()[0])
+            return 1
+        except Exception as e:  # noqa: BLE001 - stop the batch, report clearly
+            print(f"::error title=Build failed::{type(e).__name__}: {str(e).splitlines()[0][:300]}")
+            print(f"\nSTOPPED on {topic['id']} after {len(ledger.load())} published.")
             return 1
         reel_id = meta["reel_id"]
 
@@ -197,20 +199,17 @@ def main() -> int:
         failures = result.get("_failures") or {}
 
         # publish() writes the ledger itself; nothing to do here on success.
-        for platform, err in failures.items():
-            print(f"::warning title={platform} failed::{err[:300]}")
-
-        # The channel cap is a daily boundary, not a fault. Retrying the next reel
-        # would hit the same wall and waste API calls, so stop the whole batch and
-        # leave the rest queued. The topic is not in the ledger, so nothing is lost
-        # and tomorrow's run picks it up.
-        if any("CHANNEL upload limit" in str(v) for v in failures.values()):
-            stopped_by_cap = True
-            print("::warning title=Daily upload cap reached::"
-                  f"YouTube channel limit hit after {len(ledger.load())} published; "
-                  f"{len(topics) - topics.index(topic)} reel(s) still queued.")
-            break
-        failed += 1
+        # Stop the whole batch on the first failure. Continuing would build
+        # another reel against a broken condition (cap, quota, expired token) and
+        # burn time or neurons for nothing. The topic stays out of the ledger, so
+        # nothing is lost and the next run retries it.
+        if failures:
+            for platform, err in failures.items():
+                first = str(err).splitlines()[0]
+                print(f"::error title={platform} failed::{first[:300]}")
+            left = len(topics) - topics.index(topic)
+            print(f"\nSTOPPED after {len(ledger.load())} published. {left} reel(s) still queued.")
+            return 1
 
     print(f"\nledger now holds {len(ledger.load())} published topic(s)")
     return 0
