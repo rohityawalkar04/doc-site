@@ -118,7 +118,10 @@ def main() -> int:
     cfg.override("visuals.provider", "ai_cartoon")
     cfg.override("visuals.ai_backend", os.environ.get("AI_BACKEND", "cloudflare"))
 
-    if not args.dry_run:
+    # A build-only run publishes nothing, so it must not require publish
+    # credentials. Demanding the YouTube token here is what failed the first
+    # two-stage build.
+    if not args.dry_run and not args.build_only:
         problems = preflight(cfg)
         if problems:
             for p in problems:
