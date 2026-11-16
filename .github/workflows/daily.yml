@@ -7,10 +7,17 @@ name: daily-reel
 
 on:
   schedule:
-    # 08:30 UTC = 14:00 IST. Deliberately AFTER 08:00 UTC, which is midnight
-    # Pacific: YouTube's per-channel daily upload cap (uploadLimitExceeded)
-    # resets there, so a run scheduled earlier can still see yesterday's cap.
-    - cron: "30 8 * * *"
+    # Two attempts, both AFTER 08:00 UTC (midnight Pacific), where YouTube's
+    # per-channel daily upload cap resets.
+    #
+    # Why two: GitHub's schedule event is best-effort - its docs warn that runs
+    # "may be dropped" under load, and the start of the hour is the worst time.
+    # --once-per-day makes the second attempt free: if the first published, the
+    # second exits immediately.
+    #
+    # Minutes are deliberately off :00 and :30.
+    - cron: "17 8 * * *"      # 13:47 IST
+    - cron: "17 11 * * *"     # 16:47 IST
   workflow_dispatch:
     inputs:
       mode:
@@ -153,6 +160,7 @@ jobs:
         run: |
           PYTHONPATH=src python -u scripts/cloud_run.py \
             --count "${{ github.event.inputs.count || '1' }}" \
+            ${{ github.event_name == 'schedule' && '--once-per-day' || '' }} \
             ${{ github.event.inputs.mode == 'dry-run' && '--dry-run' || '' }}
 
       - name: Record what was published

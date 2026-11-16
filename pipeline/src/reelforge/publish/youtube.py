@@ -80,6 +80,34 @@ def _service(cfg):
     return build(API, VERSION, credentials=creds, cache_discovery=False)
 
 
+def authorise(cfg) -> Path:
+    """Run the OAuth consent flow on purpose and cache the token.
+
+    Separate from upload() so re-authorising never requires uploading something
+    just to refresh a credential.
+    """
+    from google_auth_oauthlib.flow import InstalledAppFlow
+
+    secret = Path(cfg.path(os.environ.get("YT_CLIENT_SECRET", "secrets/yt_client_secret.json")))
+    token = Path(cfg.path(os.environ.get("YT_TOKEN", "secrets/yt_token.json")))
+    if not secret.exists():
+        raise RuntimeError(
+            f"missing OAuth client secret at {secret}\n"
+            "  Google Cloud Console > APIs & Services > Credentials >\n"
+            "  Create credentials > OAuth client ID > Desktop app."
+        )
+    creds = InstalledAppFlow.from_client_secrets_file(
+        str(secret), SCOPES
+    ).run_local_server(port=0, open_browser=True)
+    token.parent.mkdir(parents=True, exist_ok=True)
+    token.write_text(creds.to_json())
+    try:
+        os.chmod(token, 0o600)
+    except OSError:
+        pass
+    return token
+
+
 def upload(cfg, video: Path, meta: dict) -> dict:
     from googleapiclient.http import MediaFileUpload
 

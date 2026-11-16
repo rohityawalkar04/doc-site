@@ -11,6 +11,7 @@ CI runner has no history to fall back on.
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -18,28 +19,37 @@ def _path() -> Path:
     return Path(__file__).resolve().parents[2] / "state" / "published.json"
 
 
-def load() -> list[str]:
+def _read() -> dict:
     p = _path()
     if not p.exists():
-        return []
+        return {}
     try:
-        data = json.loads(p.read_text())
+        return json.loads(p.read_text()) or {}
     except (ValueError, OSError):
-        return []
-    return [str(x) for x in (data.get("published") or [])]
+        return {}
 
 
-def add(topic_id: str | None) -> None:
+def load() -> list[str]:
+    return [str(x) for x in (_read().get("published") or [])]
+
+
+def last_published_date() -> str | None:
+    """UTC date of the most recent publish. Used to make retries idempotent."""
+    return _read().get("last_published") or None
+
+
+def add(topic_id: str | None, when: str | None = None) -> None:
     """Idempotent: records a topic once, whatever platform succeeded."""
     if not topic_id:
         return
-    done = load()
-    if str(topic_id) in done:
-        return
-    done.append(str(topic_id))
+    data = _read()
+    done = [str(x) for x in (data.get("published") or [])]
+    if str(topic_id) not in done:
+        done.append(str(topic_id))
+    stamp = when or datetime.now(timezone.utc).strftime("%Y-%m-%d")
     p = _path()
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps({"published": done}, indent=2) + "\n")
+    p.write_text(json.dumps({"published": done, "last_published": stamp}, indent=2) + "\n")
 
 
 def is_published(topic_id: str) -> bool:

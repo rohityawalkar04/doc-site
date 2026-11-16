@@ -15,6 +15,7 @@ import argparse
 import json
 import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -102,6 +103,9 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--build-only", action="store_true",
                     help="build reels for review; publish nothing and leave the ledger alone")
+    ap.add_argument("--once-per-day", action="store_true",
+                    help="exit if a reel was already published today (UTC); makes "
+                         "redundant scheduled triggers safe")
     args = ap.parse_args()
 
     if args.dry_run:
@@ -136,6 +140,15 @@ def main() -> int:
             print(msg)
             return 1
         print("preflight: Cloudflare Workers AI configured")
+
+    # GitHub's schedule event is best-effort and can drop a run under load, so
+    # the workflow fires more than once a day. This guard makes the retries free:
+    # the first success stamps the date and the rest become no-ops.
+    if args.once_per_day:
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        if ledger.last_published_date() == today:
+            print(f"already published on {today}; nothing to do")
+            return 0
 
     done = ledger.load()
     topics = [t for t in config.load_topics() if str(t["id"]) not in done]

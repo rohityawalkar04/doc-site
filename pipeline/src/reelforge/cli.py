@@ -151,6 +151,19 @@ def cmd_render(args) -> int:
 
 
 # --------------------------------------------------------------------------- list
+def cmd_auth(args) -> int:
+    """Re-authorise a platform without publishing anything."""
+    cfg = _boot()
+    if args.platform != "youtube":
+        raise SystemExit("only youtube needs interactive authorisation")
+    from .publish import youtube
+
+    token = youtube.authorise(cfg)
+    print(f"\n  token written to {token}")
+    print("  push it to CI with: ./scripts/reauth.sh --upload-only")
+    return 0
+
+
 def cmd_list(args) -> int:
     cfg = _boot()
     store = state.Store(cfg.db)
@@ -290,6 +303,10 @@ def main(argv: list[str] | None = None) -> int:
     ls = sub.add_parser("list", help="recent reels")
     ls.add_argument("--limit", type=int, default=20)
     ls.set_defaults(fn=cmd_list)
+
+    au = sub.add_parser("auth", help="re-authorise a platform (opens a browser)")
+    au.add_argument("platform", choices=["youtube"])
+    au.set_defaults(fn=cmd_auth)
 
     vf = sub.add_parser("verify", help="check a reel against platform specs")
     vf.add_argument("reel_id")
