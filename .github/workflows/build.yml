@@ -7,9 +7,16 @@ name: build
 
 on:
   schedule:
-    # 08:17 UTC = 13:47 IST, after the Pacific-midnight cap reset.
-    # Off :00 and :30 because GitHub's scheduler is worst at the top of the hour.
-    - cron: "17 8 * * *"
+    # 13:37 UTC = 19:07 IST - inside the 19:00-20:00 IST posting window, and
+    # early enough in it that review + publish still land before 20:00.
+    #
+    # ONE slot on purpose. A build is not idempotent per day: each run picks the
+    # next unpublished topic, so a second slot would build a second episode and
+    # spend another ~600 neurons. If GitHub drops this run, trigger it manually.
+    #
+    # :37 rather than :00 or :30 because GitHub's scheduler is worst at the top
+    # of the hour and can drop runs entirely under load.
+    - cron: "37 13 * * *"
   workflow_dispatch:
     inputs:
       count:

@@ -298,8 +298,9 @@ card, no machine at home.
      (`permissions: contents: read`).
    - Download the artifact, watch it. Happy? **Actions → publish → Run workflow**,
      paste the build run's id, pick a platform. That is the only step that posts.
-4. Build runs daily at `17 8 * * *` = 13:47 IST, after the Pacific-midnight cap
-   reset and off the busy top-of-hour. Publishing never runs on a schedule.
+4. Build runs daily at `37 13 * * *` = **19:07 IST**, inside the evening posting
+   window and early enough that review + publish still land before 20:00.
+   Publishing never runs on a schedule.
 
 ### What changes in the cloud
 
