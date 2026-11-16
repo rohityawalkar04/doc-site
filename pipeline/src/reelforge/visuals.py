@@ -118,17 +118,20 @@ def from_image(cfg, src: Path, seconds: float, out: Path, motion: str = "in") ->
     frames = max(2, int(seconds * fps))
     over = 1.6  # headroom for the crop, so panning never reveals an edge
     centre = "x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+    rate = float(cfg.get("visuals.zoom_rate", 0.0024))
+    zmax = float(cfg.get("visuals.zoom_max", 1.34))
+
     if motion == "out":
-        z = f"'max({1.28:.3f}-0.0016*on,1.001)'"
+        z = f"'max({zmax:.3f}-{rate}*on,1.001)'"
         pos = centre
     elif motion == "left":
-        z = "'1.14'"
+        z = f"'{(zmax + 0.02):.3f}'"
         pos = f"x='(iw-iw/zoom)*(1-on/{frames})':y='ih/2-(ih/zoom/2)'"
     elif motion == "right":
-        z = "'1.14'"
+        z = f"'{(zmax + 0.02):.3f}'"
         pos = f"x='(iw-iw/zoom)*(on/{frames})':y='ih/2-(ih/zoom/2)'"
     else:  # "in"
-        z = "'min(1.0+0.0016*on,1.28)'"
+        z = f"'min(1.0+{rate}*on,{zmax})'"
         pos = centre
 
     vf = (

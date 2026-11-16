@@ -292,10 +292,14 @@ card, no machine at home.
    | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` | Cloudflare dashboard |
    | `IG_USER_ID`, `IG_ACCESS_TOKEN`, `FB_PAGE_ID`, `FB_PAGE_TOKEN` | `scripts/meta_setup.py` |
 
-3. Test it manually: **Actions → daily-reel → Run workflow**, set *mode* to
-   `dry-run` (a dropdown: `publish` or `dry-run`). Dry-run builds and attaches
-   the mp4 without posting anything.
-4. Then leave it: `cron: 30 3 * * *` = 09:00 IST.
+3. **Two stages, deliberately:**
+   - **Actions → build → Run workflow** builds a reel and attaches it as the
+     `reels` artifact. It publishes nothing and cannot even write the ledger
+     (`permissions: contents: read`).
+   - Download the artifact, watch it. Happy? **Actions → publish → Run workflow**,
+     paste the build run's id, pick a platform. That is the only step that posts.
+4. Build runs daily at `17 8 * * *` = 13:47 IST, after the Pacific-midnight cap
+   reset and off the busy top-of-hour. Publishing never runs on a schedule.
 
 ### What changes in the cloud
 

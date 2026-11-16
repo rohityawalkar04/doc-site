@@ -1,0 +1,109 @@
+name: build
+
+# Stage 1 of 2. Builds a reel and attaches it as an artifact. Publishes NOTHING.
+# Watch the artifact, then run the `publish` workflow with this run's id.
+#
+# Runs every day so a reel is waiting for you; it never posts on its own.
+
+on:
+  schedule:
+    # 08:17 UTC = 13:47 IST, after the Pacific-midnight cap reset.
+    # Off :00 and :30 because GitHub's scheduler is worst at the top of the hour.
+    - cron: "17 8 * * *"
+  workflow_dispatch:
+    inputs:
+      count:
+        description: "how many reels to build"
+        default: "1"
+
+permissions:
+  contents: read              # build must not be able to change the ledger
+
+concurrency:
+  group: build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: pipeline
+    steps:
+      - uses: actions/checkout@v4
+
+      # actions/checkout pins the commit that TRIGGERED this run, not current
+      # main. Read the ledger from origin so a reel that was published while
+      # this run queued is not built again.
+      - name: Refresh the published ledger from main
+        run: |
+          git fetch --depth=1 origin main
+          git show origin/main:pipeline/state/published.json > state/published.json
+          python3 -c "import json;print('ledger entries:', len(json.load(open('state/published.json'))['published']))"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg >/dev/null
+
+      - name: Install Python dependencies
+        run: pip install --quiet -r requirements.txt
+
+      - name: Verify dependencies and imports
+        env:
+          PYTHONPATH: src
+        run: |
+          python scripts/check_deps.py
+          python -c "
+          import reelforge.cli, reelforge.pipeline, reelforge.captions_png
+          import reelforge.visuals, reelforge.render, reelforge.voice
+          import reelforge.llm, reelforge.meta, reelforge.publish
+          print('imports OK')
+          "
+
+      - name: Cache piper voice
+        uses: actions/cache@v4
+        with:
+          path: pipeline/assets/piper
+          key: piper-en_US-ryan-high-v1
+
+      - name: Check required secrets are present
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          missing=""
+          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then missing="$missing CLOUDFLARE_ACCOUNT_ID"; fi
+          if [ -z "$CLOUDFLARE_API_TOKEN" ];  then missing="$missing CLOUDFLARE_API_TOKEN"; fi
+          if [ -n "$missing" ]; then
+            echo "::error title=Missing repository secrets::Not set:$missing"
+            echo "  CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN = dash.cloudflare.com > My Profile > API Tokens"
+            exit 1
+          fi
+          echo "image backend secrets present"
+
+      - name: Build for review
+        env:
+          AI_BACKEND: cloudflare
+          PYTHONUNBUFFERED: "1"
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          PYTHONPATH=src python -u scripts/cloud_run.py \
+            --count "${{ github.event.inputs.count || '1' }}" \
+            --build-only
+
+      - name: Attach the reel for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: reels
+          path: |
+            pipeline/out/*.mp4
+            pipeline/out/*.json
+          if-no-files-found: error
+          retention-days: 14

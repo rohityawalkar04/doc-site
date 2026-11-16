@@ -50,8 +50,16 @@ captions:
   # Homebrew's ffmpeg 8 has no libass, so `auto` resolves to png here.
   mode: auto
   font: Anton
-  size: 88
+  size: 96                 # bigger reads better on a phone
   uppercase: true
+  # Karaoke-style word highlighting: "all" | "hook" | false
+  # Each card is a separate overlay input and the cost is roughly linear in the
+  # count: 130 cards measured ~8 minutes for a 40s reel, versus ~50s at 45.
+  # "hook" keeps the effect where it earns its keep - scene one.
+  per_word: hook
+  # Scene one renders fully in the accent colour - the first frame is the only
+  # one a viewer is guaranteed to see.
+  accent_hook: true
   max_words_per_line: 3
   max_chars_per_line: 20
   primary: "&H004DD8FF"     # ASS &HAABBGGRR - spoken word colour (warm yellow)
@@ -108,6 +116,8 @@ visuals:
   crf: 20
   preset: ultrafast        # per-scene b-roll; speed matters, quality does not
   grain: false             # temporal noise costs ~3x encode time; off by default
+  zoom_rate: 0.0024        # punchier than the original 0.0016
+  zoom_max: 1.34
   final_preset: veryfast   # the one encode that ships
   final_crf: 19
 
