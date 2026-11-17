@@ -159,9 +159,19 @@ jobs:
             exit 0
           fi
           git commit -m "chore: record published reel [skip ci]"
+
+          # actions/checkout leaves a DETACHED HEAD for schedule and
+          # workflow_dispatch runs, where a bare `git push` fails with
+          # "push the history leading to the current (detached HEAD)". That is
+          # exactly how a reel got uploaded twice on 16 Nov: the upload worked,
+          # the ledger never landed, and the next run did not know.
+          # Always push an explicit refspec.
           for attempt in 1 2 3; do
             git pull --rebase --autostash origin main >/dev/null 2>&1 || true
-            if git push; then echo "ledger pushed (attempt $attempt)"; exit 0; fi
+            if git push origin HEAD:main; then
+              echo "ledger pushed (attempt $attempt)"
+              exit 0
+            fi
             sleep 5
           done
           echo "::error title=Ledger NOT recorded::push failed after 3 attempts. Add the topic_id to state/published.json by hand."
