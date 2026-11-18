@@ -81,14 +81,14 @@ class ShortsQualityTests(unittest.TestCase):
         found = [{"url": "https://images.example/tea.jpg", "license": "cc0"}]
         with patch.object(
             visuals.requests, "get",
-            side_effect=[Response([]), Response([]), Response([]), Response(found)],
+            side_effect=[Response([]), Response([]), Response(found)],
         ) as get:
             result = visuals._openverse_candidates("a spilled cup of dark tea")
         self.assertEqual(result, found)
-        self.assertEqual(get.call_count, 4)
+        self.assertEqual(get.call_count, 3)
         self.assertEqual(
             [call.kwargs["params"]["q"] for call in get.call_args_list],
-            ["a spilled cup of dark tea", "cup tea", "cup tea", "tea"],
+            ["a spilled cup of dark tea", "cup tea", "tea"],
         )
 
     def test_empty_openverse_results_fail_instead_of_using_gradient(self):
