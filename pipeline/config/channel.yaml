@@ -11,6 +11,10 @@ language: en
 # ---- script ---------------------------------------------------------------------
 llm:
   provider: ollama
+  # Local Ollama chain: primary first, then a smaller model for 16 GB machines.
+  models:
+    - qwen2.5:7b-instruct
+    - gemma3:4b
   model: qwen2.5:7b-instruct
   temperature: 0.8
   timeout: 300
@@ -36,7 +40,7 @@ voice:
   # edge-tts is throttled hard from cloud IPs (GitHub runners fail after ~5
   # scenes) and has no clear commercial licence.
   # edge: better sounding, but unreliable unattended and licence unclear.
-  engine: edge
+  engine: kokoro
   piper_model: assets/piper/en_US-ryan-high.onnx
   name: en-US-AndrewNeural    # the five-minute-rule voice
   rate: "+0%"              # +8% shaved ~8% off duration; natural pace clears 30s
@@ -87,7 +91,8 @@ visuals:
   # Empirical limits of the free tier (Nov 2026): model flux returns 402,
   # sana works but is throttled so hard that ~1 in 5 requests succeeds. It is a
   # fallback, not the default.
-  ai_backend: local_sd     # local_sd | pollinations
+  ai_backend: local_sd     # local_sd | pollinations | cloudflare
+  remote_fallbacks: false  # true enables quota-limited hosted fallbacks after local failure
   local_model: stabilityai/sdxl-turbo
   local_steps: 2           # turbo checkpoints: guidance 0.0, 1-4 steps
   ai_model: sana
