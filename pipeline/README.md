@@ -261,19 +261,21 @@ hung request used to stall a whole reel.
 Measured end-to-end: **5 reels (10 scenes each, ~35 s) in ~19 minutes**, versus
 ~20 minutes for a single reel before the resolution fix.
 
-## Local scheduling
+## GitHub Actions on your M4 Mac
 
-The image model runs on the M4 Mac, not GitHub-hosted Linux runners. Use the included
-macOS `launchd` scheduler only while the Mac is available and awake:
+The GitHub Actions workflow uses a **self-hosted macOS ARM64 runner** labelled
+`gita-grit-m4`. It can be started manually or daily at 09:00 India time. It
+generates one reel locally, runs the technical video checks, and automatically
+publishes a passing reel to YouTube. It does not run on GitHub-hosted Linux
+runners and does not publish on pushes or pull requests.
 
-```bash
-./scripts/schedule.sh install 09:00
-./scripts/schedule.sh remove
-```
+Follow [the self-hosted M4 runner setup](docs/FREE_CI_SETUP.md) before enabling
+the workflow. The Mac must be awake and the runner online. YouTube OAuth
+credentials are stored as encrypted GitHub Actions secrets and materialized
+temporarily with restrictive file permissions during the job.
 
-The GitHub Actions reel workflow is now informational only. It does not generate
-images, invoke hosted image services, or publish videos. This avoids silently
-falling back to cloud image APIs or slow CPU inference.
+The macOS `launchd` scheduler remains an alternative if you prefer to schedule
+directly on the Mac rather than through GitHub Actions.
 
 ## Layout
 
