@@ -196,37 +196,64 @@ def _openverse_candidates(query: str) -> list[dict]:
     ]
     queries = list(dict.fromkeys(q[:200] for q in candidates_to_try if q))
     for search_query in queries:
-        try:
-            r = requests.get(
-                OPENVERSE_IMAGES,
-                params={"q": search_query, "license": "cc0", "page_size": 20},
-                headers={"User-Agent": "ReelForge/1.0 (openverse anonymous media search)"},
-                timeout=30,
-            )
-            if r.status_code == 429:
-                raise RuntimeError("Openverse anonymous API rate limit reached; retry later")
-            r.raise_for_status()
-            candidates = [
-                item for item in r.json().get("results", [])
-                if item.get("url", "").startswith("https://")
-                and item.get("license", "").lower() == "cc0"
-            ]
-            if candidates:
-                return candidates
-        except requests.HTTPError as exc:
-            response = exc.response
-            status = response.status_code if response is not None else "unknown"
-            detail = (response.text or "")[:500] if response is not None else ""
-            request_id = ""
-            if response is not None:
-                request_id = response.headers.get("x-request-id") or response.headers.get("cf-ray") or ""
-            suffix = f"; request_id={request_id}" if request_id else ""
-            raise RuntimeError(
-                f"Openverse image search failed ({status}): {exc}; "
-                f"response={detail!r}{suffix}"
-            ) from exc
-        except requests.RequestException as exc:
-            raise RuntimeError(f"Openverse image search failed: {exc}") from exc
+        # Openverse/CDN occasionally returns transient 5xx gateway errors.
+        # Retry only transient failures; authentication and other 4xx errors
+        # remain immediate failures so we never hide a configuration problem.
+        max_attempts = 3
+        for attempt in range(max_attempts):
+            try:
+                r = requests.get(
+                    OPENVERSE_IMAGES,
+                    params={"q": search_query, "license": "cc0", "page_size": 20},
+                    headers={"User-Agent": "ReelForge/1.0 (openverse anonymous media search)"},
+                    timeout=30,
+                )
+                if r.status_code == 429 or r.status_code in (500, 502, 503, 504):
+                    if attempt < max_attempts - 1:
+                        retry_after = r.headers.get("Retry-After", "")
+                        try:
+                            delay = min(max(float(retry_after), 1.0), 15.0) if retry_after else (2 ** attempt)
+                        except ValueError:
+                            delay = 2 ** attempt
+                        print(
+                            f"    ! Openverse temporary HTTP {r.status_code}; "
+                            f"retrying in {delay:g}s ({attempt + 1}/{max_attempts})"
+                        )
+                        time.sleep(delay)
+                        continue
+                if r.status_code == 429:
+                    raise RuntimeError("Openverse anonymous API rate limit reached after retries; retry later")
+                r.raise_for_status()
+                candidates = [
+                    item for item in r.json().get("results", [])
+                    if item.get("url", "").startswith("https://")
+                    and item.get("license", "").lower() == "cc0"
+                ]
+                if candidates:
+                    return candidates
+                break
+            except requests.HTTPError as exc:
+                response = exc.response
+                status = response.status_code if response is not None else "unknown"
+                detail = (response.text or "")[:500] if response is not None else ""
+                request_id = ""
+                if response is not None:
+                    request_id = response.headers.get("x-request-id") or response.headers.get("cf-ray") or ""
+                suffix = f"; request_id={request_id}" if request_id else ""
+                raise RuntimeError(
+                    f"Openverse image search failed ({status}): {exc}; "
+                    f"response={detail!r}{suffix}"
+                ) from exc
+            except requests.RequestException as exc:
+                if attempt < max_attempts - 1:
+                    delay = 2 ** attempt
+                    print(
+                        f"    ! Openverse network error; retrying in {delay}s "
+                        f"({attempt + 1}/{max_attempts}): {exc}"
+                    )
+                    time.sleep(delay)
+                    continue
+                raise RuntimeError(f"Openverse image search failed after retries: {exc}") from exc
     return []
 
 def _download(url: str, dest: Path) -> Path:
