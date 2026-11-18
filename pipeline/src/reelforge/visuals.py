@@ -253,72 +253,40 @@ def build_prompt(cfg, query: str) -> str:
     return f"{q}, {style}" if style else q
 
 
-_PIPE = None
+_MFLUX_MODEL = None
 
 
-def _local_pipe(cfg):
-    """Load the local diffusion pipeline once per process (MPS on Apple Silicon)."""
-    global _PIPE
-    if _PIPE is None:
-        import torch
-        from diffusers import AutoPipelineForText2Image
+def _mflux_model(cfg):
+    """Load the quantized Z-Image-Turbo model once per process on Apple Silicon."""
+    global _MFLUX_MODEL
+    if sys.platform != "darwin" or os.uname().machine != "arm64":
+        raise RuntimeError(
+            "The mflux_z_image backend requires an Apple Silicon Mac. "
+            "Run reel generation on the M4 Mac, not a GitHub-hosted Linux runner."
+        )
+    if _MFLUX_MODEL is None:
+        from mflux.models.z_image import ZImageTurbo
 
-        model = cfg.get("visuals.local_model", "stabilityai/sdxl-turbo")
-        device = "mps" if torch.backends.mps.is_available() else "cpu"
-        dtype = torch.float16 if device == "mps" else torch.float32
-        try:
-            pipe = AutoPipelineForText2Image.from_pretrained(
-                model, torch_dtype=dtype, variant="fp16"
-            )
-        except Exception:
-            pipe = AutoPipelineForText2Image.from_pretrained(model, torch_dtype=dtype)
-        pipe.to(device)
-        try:
-            pipe.set_progress_bar_config(disable=True)
-        except Exception:
-            pass
-        _PIPE = (pipe, torch, device)
-    return _PIPE
+        quantize = int(cfg.get("visuals.mflux_quantize", 4))
+        _MFLUX_MODEL = ZImageTurbo(quantize=quantize)
+    return _MFLUX_MODEL
 
 
-def _gen_local(cfg, prompt: str, seed: int, dest: Path) -> Path | None:
-    """Local text-to-image. Free, unlimited, offline; costs wall-clock time only.
-
-    Turbo/SDXL-turbo checkpoints are distilled: guidance_scale must be 0.0 and
-    1-4 steps, otherwise output is washed out.
-    """
-    try:
-        pipe, torch, device = _local_pipe(cfg)
-    except Exception as e:
-        fallback.disable("local_sd", f"{type(e).__name__}: {e}", seconds=3600)
-        print(f"    ! local diffusion unavailable ({type(e).__name__}: {e}); cooling down for 1 hour")
-        return None
-
-    w = int(cfg.get("visuals.ai_width", 832))
-    h = int(cfg.get("visuals.ai_height", 1216))
-    # SDXL requires both dimensions divisible by 8; 1138 silently raises.
-    w = (w // 8) * 8
-    h = (h // 8) * 8
-    steps = int(cfg.get("visuals.local_steps", 2))
-    gen = torch.Generator(device="cpu").manual_seed(seed & 0x7FFFFFFF)
-    try:
-        image = pipe(
-            prompt=prompt,
-            num_inference_steps=steps,
-            guidance_scale=0.0,
-            width=w,
-            height=h,
-            generator=gen,
-        ).images[0]
-    except Exception as e:
-        # OOM / backend failures are usually machine-wide for this run. Avoid
-        # repeating the same expensive failure for every remaining scene.
-        fallback.disable("local_sd", f"{type(e).__name__}: {e}", seconds=900)
-        print(f"    ! local generation failed ({type(e).__name__}: {e}); cooling down for 15 minutes")
-        return None
-    image.save(dest, quality=95)
+def _gen_mflux_z_image(cfg, prompt: str, seed: int, dest: Path) -> Path | None:
+    """Generate with Z-Image-Turbo through native Apple MLX (no network inference)."""
+    model = _mflux_model(cfg)
+    width = max(256, (int(cfg.get("visuals.ai_width", 512)) // 16) * 16)
+    height = max(256, (int(cfg.get("visuals.ai_height", 768)) // 16) * 16)
+    steps = int(cfg.get("visuals.local_steps", 9))
+    image = model.generate_image(
+        prompt=prompt,
+        seed=seed & 0x7FFFFFFF,
+        num_inference_steps=steps,
+        width=width,
+        height=height,
+    )
+    image.save(str(dest))
     return dest
-
 
 def _gen_pollinations(cfg, prompt: str, seed: int, dest: Path) -> Path | None:
     """Free image generation via Pollinations.
@@ -466,7 +434,7 @@ def _gen_cloudflare(cfg, prompt: str, seed: int, dest: Path) -> Path | None:
 
 
 def generate_image(cfg, query: str, seed: int, dest: Path) -> Path | None:
-    """Generate one illustration. Cached on disk by seed, so re-renders are free."""
+    """Generate one local AI image. Cached on disk by seed, so rerenders are free."""
     if dest.exists():
         try:
             if dest.stat().st_size > 5_000:
@@ -478,55 +446,27 @@ def generate_image(cfg, query: str, seed: int, dest: Path) -> Path | None:
         dest.unlink(missing_ok=True)
 
     prompt = build_prompt(cfg, query)
-    backend = cfg.get("visuals.ai_backend", "local_sd")
+    backend = cfg.get("visuals.ai_backend", "mflux_z_image")
+    if backend != "mflux_z_image":
+        raise RuntimeError(
+            f"Unsupported visual backend {backend!r}. This channel is configured "
+            "for local MFLUX + Z-Image-Turbo only; remote image services are disabled."
+        )
 
-    # In CI there is no GPU and no model cache, so hosted is tried first.
-    remote_fallbacks = bool(cfg.get("visuals.remote_fallbacks", False))
-    # Local mode is genuinely local by default. Hosted free tiers are optional:
-    # they are quota-limited and may change without notice.
-    cloud_no_local = bool(cfg.get("visuals.cloud_no_local_fallback", False))
-    order = {
-        "local_sd": [_gen_local] + ([_gen_cloudflare, _gen_pollinations] if remote_fallbacks else []),
-        # Hosted CI has no GPU. Do not download/run SDXL on CPU when Cloudflare fails.
-        "cloudflare": [_gen_cloudflare] if cloud_no_local else [_gen_cloudflare, _gen_local],
-        "pollinations": [_gen_pollinations, _gen_cloudflare, _gen_local],
-    }.get(backend, [_gen_local] + ([_gen_cloudflare, _gen_pollinations] if remote_fallbacks else []))
-
-    providers = {
-        _gen_local: "local_sd",
-        _gen_cloudflare: "cloudflare",
-        _gen_pollinations: "pollinations",
-    }
-    for gen in order:
-        provider_name = providers[gen]
-        if not fallback.available(provider_name):
-            print(f"    ! {provider_name} temporarily skipped (cooldown active)")
-            continue
-        try:
-            img = gen(cfg, prompt, seed, dest)
-        except AiQuotaExhausted as e:
-            # Quota exhaustion is account-wide. Stop before a placeholder reel can publish.
-            fallback.disable(provider_name, str(e), seconds=86400)
-            print(f"    ! {provider_name} quota exhausted; stopping image generation")
-            raise
-        except Exception as e:
-            fallback.disable(provider_name, f"{type(e).__name__}: {e}", seconds=900)
-            print(f"    ! {provider_name} failed; cooling down for 15 minutes: {e}")
-            continue
-        if img is not None:
-            try:
-                if not img.exists() or img.stat().st_size < 5_000:
-                    raise ValueError("generated image is missing or too small")
-                with Image.open(img) as check:
-                    check.verify()
-            except Exception as e:
-                img.unlink(missing_ok=True)
-                fallback.disable(provider_name, f"invalid image: {e}", seconds=900)
-                print(f"    ! {provider_name} returned an invalid image: {e}")
-                continue
-            fallback.enable(provider_name)
-            return img
-    return None
+    provider_name = "mflux_z_image"
+    if not fallback.available(provider_name):
+        raise RuntimeError("Local MFLUX backend is in cooldown after a previous failure.")
+    try:
+        img = _gen_mflux_z_image(cfg, prompt, seed, dest)
+        if img is None or not img.exists() or img.stat().st_size < 5_000:
+            raise ValueError("generated image is missing or too small")
+        with Image.open(img) as check:
+            check.verify()
+        fallback.enable(provider_name)
+        return img
+    except Exception as e:
+        fallback.disable(provider_name, f"{type(e).__name__}: {e}", seconds=900)
+        raise RuntimeError(f"Local Z-Image-Turbo generation failed: {e}") from e
 
 
 # --------------------------------------------------------------------------- local
