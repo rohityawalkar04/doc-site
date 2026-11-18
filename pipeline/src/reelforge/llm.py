@@ -248,7 +248,7 @@ def _normalise(raw: dict, topic: dict, cfg) -> dict:
     }
 
 
-def _from_beats(topic: dict) -> dict:
+def _from_beats(topic: dict, cfg) -> dict:
     """Beats may be plain strings or {n: narration, v: visual query}.
 
     The dict form matters for AI visuals: without an explicit query every scene
@@ -330,7 +330,7 @@ def generate(cfg, topic: dict) -> tuple[dict, str]:
     # Beats mode skips the model entirely. Hand-written beats are the quality
     # floor and the only way to get an exact scene count and visual queries.
     if str(cfg.get("script.mode", "auto")).lower() == "beats":
-        script = _normalise(_from_beats(topic), topic, cfg)
+        script = _normalise(_from_beats(topic, cfg), topic, cfg)
         return script, "beats"
 
     def score(script: dict) -> tuple[int, float]:
