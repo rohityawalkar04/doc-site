@@ -63,7 +63,6 @@ def cmd_doctor(args) -> int:
 
     print("\nvisuals")
     provider = cfg.get("visuals.provider", "procedural")
-    key = os.environ.get("PEXELS_API_KEY", "").strip()
     if provider in ("ai_cartoon", "ai"):
         backend = cfg.get("visuals.ai_backend", "mflux_z_image")
         line("ai backend", backend == "mflux_z_image", backend)
@@ -76,11 +75,6 @@ def cmd_doctor(args) -> int:
                 line("MFLUX runtime", False, "pip install -r requirements-ai.txt")
         line("animate", bool(cfg.get("visuals.animate", True)),
              "zoom/pan per scene")
-    elif provider == "pexels":
-        line("pexels key", bool(key), "set PEXELS_API_KEY" if not key else "present")
-    elif provider == "local":
-        n = len(visuals._local_files())
-        line("local b-roll", n > 0, f"{n} files in assets/broll/")
     else:
         line("procedural", True, "no keys needed")
 
@@ -293,7 +287,7 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--count", type=int, default=1)
     r.add_argument("--topic", help="render one specific topic id")
     r.add_argument("--from-beats", action="store_true", help="skip the LLM, use beats")
-    r.add_argument("--provider", help="procedural | ai_cartoon | pexels | local")
+    r.add_argument("--provider", help="ai_cartoon (local MFLUX only)")
     r.add_argument("--clean", action="store_true", help="delete per-reel work dir")
     r.add_argument("--stop-on-error", action="store_true")
     r.set_defaults(fn=cmd_render)
