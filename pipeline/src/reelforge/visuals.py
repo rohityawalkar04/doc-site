@@ -20,6 +20,8 @@ from urllib.parse import quote
 
 import requests
 
+from . import fallback
+
 PEXELS_VIDEO = "https://api.pexels.com/videos/search"
 PEXELS_PHOTO = "https://api.pexels.com/v1/search"
 POLLINATIONS = "https://image.pollinations.ai/prompt/{prompt}"
@@ -458,9 +460,30 @@ def generate_image(cfg, query: str, seed: int, dest: Path) -> Path | None:
         "pollinations": [_gen_pollinations, _gen_cloudflare, _gen_local],
     }.get(backend, [_gen_local, _gen_cloudflare, _gen_pollinations])
 
+    providers = {
+        _gen_local: "local_sd",
+        _gen_cloudflare: "cloudflare",
+        _gen_pollinations: "pollinations",
+    }
     for gen in order:
-        img = gen(cfg, prompt, seed, dest)
+        provider_name = providers[gen]
+        if not fallback.available(provider_name):
+            print(f"    ! {provider_name} temporarily skipped (cooldown active)")
+            continue
+        try:
+            img = gen(cfg, prompt, seed, dest)
+        except AiQuotaExhausted as e:
+            # Quota exhaustion is account-wide, not scene-specific. Stop calling
+            # this provider for the rest of the reset window and use the next one.
+            fallback.disable(provider_name, str(e), seconds=86400)
+            print(f"    ! {provider_name} quota exhausted; switching provider")
+            continue
+        except Exception as e:
+            fallback.disable(provider_name, f"{type(e).__name__}: {e}", seconds=900)
+            print(f"    ! {provider_name} failed; cooling down for 15 minutes: {e}")
+            continue
         if img is not None:
+            fallback.enable(provider_name)
             return img
     return None
 
