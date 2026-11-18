@@ -273,6 +273,20 @@ def _from_beats(topic: dict) -> dict:
             {"narration": t, "visual_query": topic["title"]} for t in fallback if t
         ]
 
+    # Retain the opening hook and tension, sample useful middle beats, and keep
+    # the original ending/payoff. This turns long beat sheets into tighter Shorts.
+    limit = int(cfg.get("script.beats_max_scenes", 9))
+    if limit >= 4 and len(scenes) > limit:
+        middle = scenes[2:-2]
+        take = limit - 4
+        if take <= 0:
+            scenes = scenes[:2] + scenes[-2:]
+        elif take == 1:
+            scenes = scenes[:2] + [middle[len(middle) // 2]] + scenes[-2:]
+        else:
+            indices = [round(i * (len(middle) - 1) / (take - 1)) for i in range(take)]
+            scenes = scenes[:2] + [middle[i] for i in indices] + scenes[-2:]
+
     return {
         "title": topic["title"],
         "description": (topic.get("angle") or "").strip().replace("\n", " "),
