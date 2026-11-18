@@ -26,6 +26,10 @@ STDLIB = {
     "itertools", "json", "math", "os", "pathlib", "random", "re", "shutil",
     "sqlite3", "subprocess", "sys", "textwrap", "time", "typing", "urllib",
     "wave", "io", "tempfile", "struct", "unicodedata", "traceback",
+    # xml.etree.ElementTree parses the channel's RSS feed in publish/youtube.py.
+    # Stdlib, but absent from this list, which is how the 18 Nov run failed at the
+    # import gate instead of at the upload.
+    "xml",
 }
 
 # import name -> distribution name, where the two differ.
