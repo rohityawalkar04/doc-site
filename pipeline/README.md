@@ -49,6 +49,49 @@ The first model run downloads model weights; generation is then local. Model dow
 need disk space and initial internet access. Local inference is limited by the Mac's
 16 GB unified memory and may be slower than hosted services.
 
+## Local-first setup (Apple Silicon, 16 GB unified memory)
+
+1. Install the system renderer: `brew install ffmpeg`.
+2. Install Ollama, then download the ordered script models:
+
+   ```bash
+   ollama pull qwen2.5:7b-instruct
+   ollama pull gemma3:4b
+   ```
+
+3. Install the base pipeline:
+
+   ```bash
+   ./scripts/setup.sh
+   ```
+
+4. Install local AI engines (this is optional and downloads large Python packages):
+
+   ```bash
+   source .venv/bin/activate
+   pip install -r requirements-ai.txt
+   ```
+
+5. Generate one test reel before batching:
+
+   ```bash
+   reelforge doctor
+   reelforge render --count 1
+   ```
+
+Kokoro and the SDXL Turbo checkpoint download on first use. Piper is the voice
+fallback and downloads its ONNX voice if it is not cached. The first setup needs
+internet; inference is local after the required packages and model weights are
+present. Keep batch concurrency low on 16 GB unified memory (start with one reel
+at a time). SDXL may be memory- or time-intensive on this configuration; if it
+causes memory pressure, reduce `visuals.ai_width` / `visuals.ai_height` or switch
+to a smaller compatible checkpoint after testing quality.
+
+The local-first configuration sets `visuals.remote_fallbacks: false`. That means
+a local image failure degrades to the existing procedural/local asset path rather
+than silently consuming a hosted free quota. You can opt into hosted fallback
+providers explicitly, but their quotas are not unlimited.
+
 ## Configuration
 
 One file, `config/channel.yaml`. The fields that matter:
