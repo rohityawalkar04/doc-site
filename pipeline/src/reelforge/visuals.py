@@ -174,27 +174,37 @@ def _cache_dir() -> Path:
 
 
 def _openverse_candidates(query: str) -> list[dict]:
-    """Search Openverse anonymously for CC0 images (no API key required).
+    """Search Openverse anonymously for CC0 images, broadening once if needed.
 
-    CC0 avoids attribution obligations for monetized Shorts. The API is rate
-    limited; cached assets avoid repeat downloads and searches.
+    Do not constrain orientation or size at the API: those filters can exclude
+    otherwise useful CC0 images. from_image() crops landscape/square sources to
+    9:16. CC0 avoids attribution obligations for monetized Shorts.
     """
-    try:
-        r = requests.get(
-            OPENVERSE_IMAGES,
-            params={"q": query[:200], "license": "cc0", "aspect_ratio": "tall", "size": "large", "page_size": 20},
-            headers={"User-Agent": "ReelForge/1.0 (openverse anonymous media search)"},
-            timeout=30,
-        )
-        if r.status_code == 429:
-            raise RuntimeError("Openverse anonymous API rate limit reached; retry later")
-        r.raise_for_status()
-        return [
-            item for item in r.json().get("results", [])
-            if item.get("url", "").startswith("https://") and item.get("license", "").lower() == "cc0"
-        ]
-    except requests.RequestException as exc:
-        raise RuntimeError(f"Openverse image search failed: {exc}") from exc
+    words = re.findall(r"[a-zA-Z]{3,}", query.lower())
+    stop = {"the", "and", "with", "from", "into", "over", "under", "three", "four", "two", "one"}
+    broad = " ".join(word for word in words if word not in stop)
+    queries = list(dict.fromkeys(q[:200] for q in (query.strip(), broad) if q.strip()))
+    for search_query in queries:
+        try:
+            r = requests.get(
+                OPENVERSE_IMAGES,
+                params={"q": search_query, "license": "cc0", "page_size": 20},
+                headers={"User-Agent": "ReelForge/1.0 (openverse anonymous media search)"},
+                timeout=30,
+            )
+            if r.status_code == 429:
+                raise RuntimeError("Openverse anonymous API rate limit reached; retry later")
+            r.raise_for_status()
+            candidates = [
+                item for item in r.json().get("results", [])
+                if item.get("url", "").startswith("https://")
+                and item.get("license", "").lower() == "cc0"
+            ]
+            if candidates:
+                return candidates
+        except requests.RequestException as exc:
+            raise RuntimeError(f"Openverse image search failed: {exc}") from exc
+    return []
 
 def _download(url: str, dest: Path) -> Path:
     if dest.exists() and dest.stat().st_size > 10_000:
