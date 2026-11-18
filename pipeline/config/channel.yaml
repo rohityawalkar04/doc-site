@@ -74,37 +74,27 @@ captions:
 
 # ---- visuals --------------------------------------------------------------------
 visuals:
-  # provider: procedural -> ffmpeg gradients, zero keys, good for testing
-  #           ai_cartoon -> free AI illustrations (Pollinations), animated
-  #           pexels     -> licensed stock video/images (needs PEXELS_API_KEY)
-  #           local      -> whatever you drop in assets/broll/
-  # provider: openverse -> openly licensed CC0 images; anonymous API, no key
-  #           ai_cartoon -> local AI illustrations (requires SDXL + diffusers)
-  #           local      -> files dropped into assets/broll/
-  #           procedural -> gradients for preview/testing only
-  provider: openverse
+  # AI-generated visuals only: local SDXL Turbo weights, no image search or stock picker.
+  # Generation runs locally on Apple Silicon (MPS) or CPU; first run downloads model weights.
+  provider: ai_cartoon
   require_ai_images: true       # applies when provider=ai_cartoon
   animate: true            # slow zoom/pan on stills; a slideshow is not a reel
 
-  # Appended to every scene's visual_query. Flat illustration asks the model for
-  # shapes and outlines rather than photoreal mush, and "no text" matters because
-  # image models render lettering as garbage.
+  # Appended to every scene prompt. Keep a consistent cinematic-realism look.
   style_prompt: >-
-    flat vector illustration, thick bold outlines, simple geometric shapes,
-    limited warm palette, one clear subject, uncluttered plain background,
-    cinematic vertical composition, no text, no words, no letters, no watermark,
-    no user interface, no logos
+    cinematic photorealism, emotionally expressive natural human subjects,
+    dramatic practical lighting, rich but natural warm color grading,
+    atmospheric depth, carefully composed vertical 9:16 film still,
+    realistic environments and textures, one clear focal subject,
+    no text, no words, no letters, no watermark, no logos
 
-  # Empirical limits of the free tier (Nov 2026): model flux returns 402,
-  # sana works but is throttled so hard that ~1 in 5 requests succeeds. It is a
-  # fallback, not the default.
-  ai_backend: local_sd     # local-only backend for optional local AI mode
-  remote_fallbacks: false  # hosted AI providers are deliberately disabled
+  # Local-only inference. No hosted image API, API key, quota, or image picker.
+  ai_backend: local_sd
+  remote_fallbacks: false
   local_model: stabilityai/sdxl-turbo
   local_steps: 2           # turbo checkpoints: guidance 0.0, 1-4 steps
   ai_model: sana
-  # 512x768 is ~5.6s/image. 832x1216 hits an MPS memory cliff at ~110s/image,
-  # which is a 20x regression for 2.5x the pixels. Both axes must be /8.
+  # Conservative working size for 16 GB Apple Silicon; both axes must be /8.
   ai_width: 512
   ai_height: 768
   ai_retries: 4
