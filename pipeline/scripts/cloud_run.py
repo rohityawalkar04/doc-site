@@ -1,7 +1,7 @@
 """Cloud entry point: build one reel and publish it, on a machine with no GPU.
 
 Designed for GitHub Actions, where:
-  * there is no GPU and no model cache  -> visuals come from Pexels' free stock library
+  * there is no GPU and no model cache  -> visuals come from Openverse's anonymous CC0 image library
   * there is no local LLM               -> scripts come from the beats in topics.yaml
   * the filesystem is wiped each run    -> "what has been published" lives in a
                                           committed JSON ledger, not in sqlite
