@@ -73,11 +73,20 @@ def publish(cfg, store: state.Store, reel_id: str, platforms: list[str],
         # actually live - including anything uploaded by hand or from a machine whose
         # ledger push lost. Ask it before spending 1,600 quota units, and before
         # putting the same video on the channel a second time.
+        #
+        # Fail closed when the channel cannot be read. A missed night is recoverable -
+        # the topic stays out of the ledger and the next run picks it up - while a
+        # second copy on the channel is not. `--force` is the human override.
         if platform == "youtube" and not ignore_ledger:
             live = youtube.recent_titles(cfg)
             if live is None:
-                print("     ! channel feed unreadable - relying on the ledger alone")
-            elif youtube.title_key(meta_mod.youtube_meta(meta)["title"]) in {
+                msg = ("channel feed unreadable after 3 attempts; refusing to upload "
+                       "blind (a duplicate is worse than a missed night). Re-run, or "
+                       "publish this one by hand with --force")
+                failures[platform] = f"ChannelUnverified: {msg}"
+                print(f"     REFUSED {msg}")
+                continue
+            if youtube.title_key(meta_mod.youtube_meta(meta)["title"]) in {
                     youtube.title_key(t) for t in live}:
                 print("     = youtube: a video with this title is already on the channel"
                       " -> skipping")

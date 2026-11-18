@@ -318,8 +318,9 @@ card, no machine at home.
    no auth. This is the only check that survives a ledger which is wrong for a
    reason outside this code - a manual upload in Studio, or a push that lost
    after the video went live. The feed covers the last 15 uploads; the ledger
-   covers everything older. If the feed cannot be read, the upload proceeds on
-   the ledger alone and says so, because a feed outage must not stop the channel.
+   covers everything older. If the feed cannot be read after three attempts the
+   upload is **refused** and the run goes red: a missed night is recoverable, a
+   second copy on the channel is not. `--force` is the human override.
 6. Runs daily at `37 13 * * *` = **19:07 IST**, inside the evening posting
    window. `:37` because GitHub's scheduler is worst at the top of the hour and
    can drop runs entirely under load.

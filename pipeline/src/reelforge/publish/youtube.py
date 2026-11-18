@@ -15,6 +15,7 @@ from __future__ import annotations
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -33,16 +34,16 @@ def title_key(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", (text or "").casefold()).strip()
 
 
-def recent_titles(cfg, timeout: float = 15.0) -> list[str] | None:
+def recent_titles(cfg, timeout: float = 15.0, attempts: int = 3) -> list[str] | None:
     """Titles of the channel's most recent uploads, from the public RSS feed.
 
     Zero quota, no OAuth scope, no auth at all: this is the one view of the
     channel that cannot be stale-and-local. The Data API's own list call would
     need `youtube.readonly` added to SCOPES, which invalidates every cached token.
 
-    Returns None when the feed cannot be read. The caller decides what that
-    means; here it means "fall back to the ledger", because a feed outage must
-    not silently stop the channel.
+    Returns None only after `attempts` tries, so a transient 5xx does not decide
+    anything. The caller treats None as "cannot verify" and refuses to upload:
+    a missed night is recoverable, a second copy on the channel is not.
 
     The feed carries the last 15 uploads, so this catches the case that actually
     happens - a run re-walking the head of its own queue. Older reels are the
@@ -52,18 +53,24 @@ def recent_titles(cfg, timeout: float = 15.0) -> list[str] | None:
     if not cid:
         return None
     url = FEED.format(cid=cid)
-    try:
-        with urllib.request.urlopen(url, timeout=timeout) as r:
-            body = r.read()
-        root = ET.fromstring(body)
-    except (urllib.error.URLError, OSError, ValueError, ET.ParseError):
-        return None
-    titles = []
-    for entry in root.findall(f"{ATOM}entry"):
-        t = entry.findtext(f"{ATOM}title")
-        if t:
-            titles.append(t.strip())
-    return titles
+    for attempt in range(1, attempts + 1):
+        try:
+            with urllib.request.urlopen(url, timeout=timeout) as r:
+                body = r.read()
+            root = ET.fromstring(body)
+            titles = []
+            for entry in root.findall(f"{ATOM}entry"):
+                t = entry.findtext(f"{ATOM}title")
+                if t:
+                    titles.append(t.strip())
+            return titles
+        except (urllib.error.URLError, OSError, ValueError, ET.ParseError) as e:
+            if attempt == attempts:
+                print(f"     ! channel feed unreadable after {attempts} attempts: "
+                      f"{type(e).__name__}: {str(e)[:120]}", flush=True)
+                return None
+            time.sleep(2 * attempt)
+    return None
 
 
 
