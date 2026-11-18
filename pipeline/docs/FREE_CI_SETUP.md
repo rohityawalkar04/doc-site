@@ -69,14 +69,29 @@ Image inference stays on the Mac. No paid image-generation API is used.
 ## 3. Set up YouTube OAuth locally
 
 Complete the YouTube Data API v3 OAuth setup described in the main README.
-Authorize the channel once on the Mac so these files exist:
+Authorize the channel once on the Mac and obtain these two JSON files:
 
 - `pipeline/secrets/yt_client_secret.json`
 - `pipeline/secrets/yt_token.json`
 
-Keep these files on the runner machine only. The workflow checks that they exist,
-restricts their permissions, and never prints their contents. Do not commit them
-or upload them as artifacts. Ensure `pipeline/secrets/` is ignored by Git.
+Create two **repository Actions secrets** under
+**Settings → Secrets and variables → Actions → New repository secret**:
+
+- `YT_CLIENT_SECRET_JSON_B64`
+- `YT_TOKEN_JSON_B64`
+
+On the Mac, base64-encode each file without adding line breaks:
+
+```bash
+base64 -i pipeline/secrets/yt_client_secret.json | tr -d '\\n'
+base64 -i pipeline/secrets/yt_token.json | tr -d '\\n'
+```
+
+Copy each command's output directly into its matching GitHub secret field. Do not
+paste either value into chat, an issue, a commit, or a workflow file. GitHub stores
+Actions secrets encrypted. The workflow decodes them with restrictive file
+permissions, never prints their contents, and removes the temporary JSON files
+after the job. Ensure `pipeline/secrets/` is ignored by Git.
 
 ## 4. Enable the workflow
 
