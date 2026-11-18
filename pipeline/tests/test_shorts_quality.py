@@ -65,6 +65,32 @@ class ShortsQualityTests(unittest.TestCase):
         self.assertEqual(first_params["q"], "a desk with three open books")
         self.assertEqual(second_params["q"], "desk open books")
 
+    def test_openverse_falls_back_to_main_subject(self):
+        class Response:
+            status_code = 200
+
+            def __init__(self, results):
+                self._results = results
+
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return {"results": self._results}
+
+        found = [{"url": "https://images.example/tea.jpg", "license": "cc0"}]
+        with patch.object(
+            visuals.requests, "get",
+            side_effect=[Response([]), Response([]), Response([]), Response(found)],
+        ) as get:
+            result = visuals._openverse_candidates("a spilled cup of dark tea")
+        self.assertEqual(result, found)
+        self.assertEqual(get.call_count, 4)
+        self.assertEqual(
+            [call.kwargs["params"]["q"] for call in get.call_args_list],
+            ["a spilled cup of dark tea", "cup tea", "cup tea", "tea"],
+        )
+
     def test_empty_openverse_results_fail_instead_of_using_gradient(self):
         cfg = {"visuals.provider": "openverse", "visuals.animate": False}
         with tempfile.TemporaryDirectory() as tmp, patch.object(
