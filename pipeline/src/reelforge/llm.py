@@ -374,6 +374,6 @@ def generate(cfg, topic: dict) -> tuple[dict, str]:
         best["_advisory"] = reason
         return best, "ollama"
 
-    script = _normalise(_from_beats(topic), topic, cfg)
+    script = _normalise(_from_beats(topic, cfg), topic, cfg)
     script["_fallback_reason"] = reason
     return script, "fallback"
