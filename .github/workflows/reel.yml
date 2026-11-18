@@ -66,8 +66,8 @@ jobs:
           test -n "$YT_TOKEN_JSON_B64"
           umask 077
           mkdir -p secrets
-          printf '%s' "$YT_CLIENT_SECRET_JSON_B64" | base64 --decode > secrets/yt_client_secret.json
-          printf '%s' "$YT_TOKEN_JSON_B64" | base64 --decode > secrets/yt_token.json
+          printf '%s' "$YT_CLIENT_SECRET_JSON_B64" | base64 -D > secrets/yt_client_secret.json
+          printf '%s' "$YT_TOKEN_JSON_B64" | base64 -D > secrets/yt_token.json
           chmod 700 secrets
           chmod 600 secrets/yt_client_secret.json secrets/yt_token.json
           python - <<'PY'
