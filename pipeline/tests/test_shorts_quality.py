@@ -37,6 +37,34 @@ class ShortsQualityTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "refusing to render a gradient"):
                 visuals.for_scene(cfg, None, 0, 3.0, "a clear subject", Path(tmp) / "scene.mp4")
 
+    def test_openverse_broadens_query_without_orientation_or_size_filters(self):
+        class Response:
+            status_code = 200
+
+            def __init__(self, results):
+                self._results = results
+
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return {"results": self._results}
+
+        found = [{"url": "https://images.example/book.jpg", "license": "cc0"}]
+        with patch.object(
+            visuals.requests, "get",
+            side_effect=[Response([]), Response(found)],
+        ) as get:
+            result = visuals._openverse_candidates("a desk with three open books")
+        self.assertEqual(result, found)
+        self.assertEqual(get.call_count, 2)
+        first_params = get.call_args_list[0].kwargs["params"]
+        second_params = get.call_args_list[1].kwargs["params"]
+        self.assertNotIn("aspect_ratio", first_params)
+        self.assertNotIn("size", first_params)
+        self.assertEqual(first_params["q"], "a desk with three open books")
+        self.assertEqual(second_params["q"], "desk open books")
+
     def test_empty_openverse_results_fail_instead_of_using_gradient(self):
         cfg = {"visuals.provider": "openverse", "visuals.animate": False}
         with tempfile.TemporaryDirectory() as tmp, patch.object(
