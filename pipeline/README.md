@@ -10,7 +10,7 @@ buy is your own time.
 config/topics.yaml ──┐
                      ├─ ollama ──> script.json
 config/channel.yaml ─┘                 │
-                                      ├─ edge-tts ──> audio + word timings
+                                      ├─ Kokoro → Piper ──> local audio + caption timings
                                       ├─ ffmpeg   ──> 1080x1920 b-roll per scene
                                       └─ Pillow   ──> caption cards
                                                      │
@@ -36,28 +36,61 @@ open out/*.mp4
 
 ## The five stages
 
-| Stage | Tool | Cost | Notes |
+| Stage | Primary | Fallback | Execution |
 |---|---|---|---|
-| Script | Ollama (`qwen2.5:7b-instruct`) | $0 | Falls back to the hand-written beat sheet in `topics.yaml` when Ollama is down or the script fails validation |
-| Voice | `edge-tts` | $0 | Returns exact word boundaries → no ASR alignment step needed |
-| Visuals | ffmpeg `gradients` / Pexels / local | $0 | `procedural` needs no keys; `pexels` needs a free key |
-| Render | ffmpeg + Pillow | $0 | 1080×1920, H.264 High, yuv420p, 30 fps, AAC 48 kHz |
-| Publish | YouTube Data API v3, Instagram Graph API | $0 | Quota-limited, not money-limited |
+| Script | Ollama Qwen2.5 7B | Ollama Gemma 3 4B → topic beat sheet | Local |
+| Voice | Kokoro | Piper | Local, offline after model download |
+| Visuals | SDXL Turbo | procedural/local assets; optional hosted providers | Local by default |
+| Render | FFmpeg + Pillow | — | Local |
+| Publish | YouTube / Meta APIs | — | Internet and platform quotas apply |
 
-Typical render: **~3.5 minutes** for a 32 s / 12-scene reel on an M4 Pro.
-Measured breakdown, which is where the tuning effort went:
+The local pipeline does not depend on Cloudflare, Pollinations, Edge TTS, or a paid API.
+The first model run downloads model weights; generation is then local. Model downloads
+need disk space and initial internet access. Local inference is limited by the Mac's
+16 GB unified memory and may be slower than hosted services.
 
-| Stage | Time | Note |
-|---|---|---|
-| script (qwen2.5:7b) | 35–70 s | 2 attempts when the first is short |
-| voice (12 scenes) | 60–90 s | `edge-tts` rate-limits; ~40% of calls need a retry |
-| visuals | 5–8 s | was ~110 s before removing the temporal `noise` filter |
-| assemble + captions | ~1 s | concat is stream-copy; captions are Pillow |
-| final encode | 35–55 s | one x264 pass, ~25–35 overlays |
-| **total** | **~3.5 min** | a 7-scene reel was ~1.5 min |
+## Local-first setup (Apple Silicon, 16 GB unified memory)
 
-The two slow stages are both bounded by things you cannot tune away: the local
-model's tokens per second, and the TTS endpoint's rate limit.
+1. Install the system renderer: `brew install ffmpeg`.
+2. Install Ollama, then download the ordered script models:
+
+   ```bash
+   ollama pull qwen2.5:7b-instruct
+   ollama pull gemma3:4b
+   ```
+
+3. Install the base pipeline:
+
+   ```bash
+   ./scripts/setup.sh
+   ```
+
+4. Install local AI engines (this is optional and downloads large Python packages):
+
+   ```bash
+   source .venv/bin/activate
+   pip install -r requirements-ai.txt
+   ```
+
+5. Generate one test reel before batching:
+
+   ```bash
+   reelforge doctor
+   reelforge render --count 1
+   ```
+
+Kokoro and the SDXL Turbo checkpoint download on first use. Piper is the voice
+fallback and downloads its ONNX voice if it is not cached. The first setup needs
+internet; inference is local after the required packages and model weights are
+present. Keep batch concurrency low on 16 GB unified memory (start with one reel
+at a time). SDXL may be memory- or time-intensive on this configuration; if it
+causes memory pressure, reduce `visuals.ai_width` / `visuals.ai_height` or switch
+to a smaller compatible checkpoint after testing quality.
+
+The local-first configuration sets `visuals.remote_fallbacks: false`. That means
+a local image failure degrades to the existing procedural/local asset path rather
+than silently consuming a hosted free quota. You can opt into hosted fallback
+providers explicitly, but their quotas are not unlimited.
 
 ## Configuration
 
@@ -66,7 +99,8 @@ One file, `config/channel.yaml`. The fields that matter:
 ```yaml
 lens / audience / tone     # what the channel is; feeds the script prompt
 script.min_scenes          # 9-11 scenes of 10-14 words ≈ 35 s
-voice.engine               # edge (default) | kokoro (Apache-2.0, clean rights)
+llm.models                 # ordered Ollama model fallback list
+voice.engine               # kokoro (primary) | piper (offline fallback)
 voice.name                 # en-US-AndrewNeural, en-IN-PrabhatNeural, ...
 visuals.provider           # procedural | pexels | local
 captions.mode              # auto | ass | png
@@ -89,15 +123,16 @@ fallback and is used verbatim, so write it well.
 
 ### AI illustrations
 
-`ai_cartoon` runs **local** Stable Diffusion (`stabilityai/sdxl-turbo`, ~6.9 GB,
-downloaded once) on Apple Silicon MPS. Free, offline, no rate limit, ~2–5 s per
-image. Swap `visuals.local_model` for `Lykon/dreamshaper-8-lcm` (~4 GB, SD1.5,
-faster, more illustration-like) if disk is tight.
+`ai_cartoon` runs local Stable Diffusion (`stabilityai/sdxl-turbo`) on Apple
+Silicon MPS at the configured 512×768 working resolution. The first run downloads
+the checkpoint. With `visuals.remote_fallbacks: false` (default), no hosted image
+service is contacted; a local generation failure falls back to the pipeline's
+existing procedural/local visual path.
 
-`visuals.ai_backend: pollinations` uses the hosted free tier instead. Do not rely
-on it: measured in Nov 2026, `model=flux` returns HTTP 402 and `model=sana` is
-throttled such that **1 of 5 requests succeeded**, each failure taking ~40 s.
-It is wired as a secondary attempt, not the default.
+Set `visuals.remote_fallbacks: true` only if you explicitly want Cloudflare and
+Pollinations attempted after local failure. Their free allocations are finite,
+rate-limited, and can change; quota exhaustion is remembered for a cooldown so
+the same unavailable provider is not hammered once per scene.
 
 Every illustration is cached in `assets/cache/ai/<seed>.jpg`, so re-rendering a
 reel costs no generation time.

@@ -20,6 +20,8 @@ from urllib.parse import quote
 
 import requests
 
+from . import fallback
+
 PEXELS_VIDEO = "https://api.pexels.com/videos/search"
 PEXELS_PHOTO = "https://api.pexels.com/v1/search"
 POLLINATIONS = "https://image.pollinations.ai/prompt/{prompt}"
@@ -269,7 +271,8 @@ def _gen_local(cfg, prompt: str, seed: int, dest: Path) -> Path | None:
     try:
         pipe, torch, device = _local_pipe(cfg)
     except Exception as e:
-        print(f"    ! local diffusion unavailable ({type(e).__name__}: {e})")
+        fallback.disable("local_sd", f"{type(e).__name__}: {e}", seconds=3600)
+        print(f"    ! local diffusion unavailable ({type(e).__name__}: {e}); cooling down for 1 hour")
         return None
 
     w = int(cfg.get("visuals.ai_width", 832))
@@ -289,7 +292,10 @@ def _gen_local(cfg, prompt: str, seed: int, dest: Path) -> Path | None:
             generator=gen,
         ).images[0]
     except Exception as e:
-        print(f"    ! local generation failed ({type(e).__name__}: {e})")
+        # OOM / backend failures are usually machine-wide for this run. Avoid
+        # repeating the same expensive failure for every remaining scene.
+        fallback.disable("local_sd", f"{type(e).__name__}: {e}", seconds=900)
+        print(f"    ! local generation failed ({type(e).__name__}: {e}); cooling down for 15 minutes")
         return None
     image.save(dest, quality=95)
     return dest
@@ -449,18 +455,41 @@ def generate_image(cfg, query: str, seed: int, dest: Path) -> Path | None:
     backend = cfg.get("visuals.ai_backend", "local_sd")
 
     # In CI there is no GPU and no model cache, so hosted is tried first.
+    remote_fallbacks = bool(cfg.get("visuals.remote_fallbacks", False))
+    # Local mode is genuinely local by default. Hosted free tiers are optional:
+    # they are quota-limited and may change without notice.
     order = {
-        "local_sd": [_gen_local, _gen_cloudflare, _gen_pollinations],
-                # No pollinations for the cloud backend: it is throttled to ~1 in 5
-        # and costs ~60s per image in retries before falling back, which
-        # reads as a frozen build.
+        "local_sd": [_gen_local] + ([_gen_cloudflare, _gen_pollinations] if remote_fallbacks else []),
+        # No pollinations for the cloud backend: it is throttled and can make a
+        # build appear frozen while retries wait.
         "cloudflare": [_gen_cloudflare, _gen_local],
         "pollinations": [_gen_pollinations, _gen_cloudflare, _gen_local],
-    }.get(backend, [_gen_local, _gen_cloudflare, _gen_pollinations])
+    }.get(backend, [_gen_local] + ([_gen_cloudflare, _gen_pollinations] if remote_fallbacks else []))
 
+    providers = {
+        _gen_local: "local_sd",
+        _gen_cloudflare: "cloudflare",
+        _gen_pollinations: "pollinations",
+    }
     for gen in order:
-        img = gen(cfg, prompt, seed, dest)
+        provider_name = providers[gen]
+        if not fallback.available(provider_name):
+            print(f"    ! {provider_name} temporarily skipped (cooldown active)")
+            continue
+        try:
+            img = gen(cfg, prompt, seed, dest)
+        except AiQuotaExhausted as e:
+            # Quota exhaustion is account-wide, not scene-specific. Stop calling
+            # this provider for the rest of the reset window and use the next one.
+            fallback.disable(provider_name, str(e), seconds=86400)
+            print(f"    ! {provider_name} quota exhausted; switching provider")
+            continue
+        except Exception as e:
+            fallback.disable(provider_name, f"{type(e).__name__}: {e}", seconds=900)
+            print(f"    ! {provider_name} failed; cooling down for 15 minutes: {e}")
+            continue
         if img is not None:
+            fallback.enable(provider_name)
             return img
     return None
 
