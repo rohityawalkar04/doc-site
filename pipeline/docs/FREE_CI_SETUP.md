@@ -22,7 +22,7 @@ The hosted workflow uses only zero-cost components for the build:
 
 For a preview, open **Actions → reel → Run workflow**, leave mode as **dry-run**, and set count to **1**. This builds one MP4 and uploads it as the `reels` artifact; it does not publish to YouTube or Meta.
 
-After watching and approving the preview, manually run the workflow with mode **publish**. Publishing additionally requires the existing `YT_CLIENT_SECRET_JSON` and `YT_TOKEN_JSON` secrets. The scheduled daily workflow continues to publish automatically and therefore also requires those YouTube secrets.
+After watching and approving the preview, manually run the workflow with mode **publish**. Publishing additionally requires the existing `YT_CLIENT_SECRET_JSON` and `YT_TOKEN_JSON` secrets. The daily scheduled workflow creates a preview artifact only. It does not publish. YouTube secrets are required only when you manually choose **publish**.
 
 ## Quality and failure policy
 
