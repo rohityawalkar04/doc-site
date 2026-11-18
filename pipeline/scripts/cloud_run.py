@@ -169,8 +169,10 @@ def main() -> int:
 
     # GitHub's schedule event is best-effort and can drop a run under load, so
     # the workflow fires more than once a day. This guard makes the retries free:
-    # the first success stamps the date and the rest become no-ops.
-    if args.once_per_day:
+    # the first success stamps the date and the rest become no-ops. A rehearsal
+    # (--dry-run / --build-only) publishes nothing, so it must not be skipped -
+    # otherwise "build for review" would silently do nothing after a good night.
+    if args.once_per_day and not args.dry_run and not args.build_only:
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         if ledger.last_published_date() == today:
             print(f"already published on {today}; nothing to do")
