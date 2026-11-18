@@ -3,7 +3,7 @@
 Providers
   procedural : ffmpeg `gradients` source. Zero keys, zero licensing questions,
                but identical-looking across videos - a testing default only.
-  pexels     : licensed stock footage/stills. Free API key, 200 req/hour.
+  openverse  : openly licensed images via anonymous API; CC0 only, no key.
   local      : files you drop into assets/broll/.
 """
 from __future__ import annotations
@@ -23,8 +23,7 @@ from PIL import Image
 
 from . import fallback
 
-PEXELS_VIDEO = "https://api.pexels.com/videos/search"
-PEXELS_PHOTO = "https://api.pexels.com/v1/search"
+OPENVERSE_IMAGES = "https://api.openverse.org/v1/images/"
 POLLINATIONS = "https://image.pollinations.ai/prompt/{prompt}"
 
 
@@ -169,47 +168,33 @@ def from_image(cfg, src: Path, seconds: float, out: Path, motion: str = "in") ->
 
 # --------------------------------------------------------------------------- pexels
 def _cache_dir() -> Path:
-    p = Path(os.environ.get("REELFORGE_ROOT", ".")) / "assets" / "cache" / "pexels"
+    p = Path(os.environ.get("REELFORGE_ROOT", ".")) / "assets" / "cache" / "openverse"
     p.mkdir(parents=True, exist_ok=True)
     return p
 
 
-def _pexels_candidates(key: str, query: str, orientation: str) -> list[tuple[str, str]]:
-    """Every usable (kind, url) for a query, videos first."""
-    out: list[tuple[str, str]] = []
-    headers = {"Authorization": key}
+def _openverse_candidates(query: str) -> list[dict]:
+    """Search Openverse anonymously for CC0 images (no API key required).
+
+    CC0 avoids attribution obligations for monetized Shorts. The API is rate
+    limited; cached assets avoid repeat downloads and searches.
+    """
     try:
         r = requests.get(
-            PEXELS_VIDEO,
-            headers=headers,
-            params={"query": query, "orientation": orientation, "per_page": 30},
-            timeout=25,
+            OPENVERSE_IMAGES,
+            params={"q": query[:200], "license": "cc0", "aspect_ratio": "tall", "size": "large", "page_size": 20},
+            headers={"User-Agent": "ReelForge/1.0 (openverse anonymous media search)"},
+            timeout=30,
         )
-        if r.status_code == 200:
-            for v in r.json().get("videos", []):
-                files = sorted(
-                    (f for f in v.get("video_files", []) if f.get("height", 0) >= 1280),
-                    key=lambda f: abs(f.get("height", 0) - 1920),
-                )
-                if files:
-                    out.append(("video", files[0]["link"]))
-    except requests.RequestException:
-        pass
-    if not out:
-        try:
-            r = requests.get(
-                PEXELS_PHOTO,
-                headers=headers,
-                params={"query": query, "orientation": orientation, "per_page": 30},
-                timeout=25,
-            )
-            if r.status_code == 200:
-                for p in r.json().get("photos", []):
-                    out.append(("photo", p["src"]["portrait"]))
-        except requests.RequestException:
-            pass
-    return out
-
+        if r.status_code == 429:
+            raise RuntimeError("Openverse anonymous API rate limit reached; retry later")
+        r.raise_for_status()
+        return [
+            item for item in r.json().get("results", [])
+            if item.get("url", "").startswith("https://") and item.get("license", "").lower() == "cc0"
+        ]
+    except requests.RequestException as exc:
+        raise RuntimeError(f"Openverse image search failed: {exc}") from exc
 
 def _download(url: str, dest: Path) -> Path:
     if dest.exists() and dest.stat().st_size > 10_000:
@@ -546,34 +531,30 @@ def for_scene(cfg, store, index: int, seconds: float, query: str, out: Path,
             )
         print("    ! AI image unavailable after retries, using procedural (explicitly allowed)")
 
-    if provider == "pexels":
-        key = os.environ.get("PEXELS_API_KEY", "").strip()
-        if not key:
-            raise RuntimeError("PEXELS_API_KEY is required; refusing to use procedural placeholders")
-        cands = [
-            c for c in _pexels_candidates(key, query, orientation) if c[1] not in used
-        ]
-        if not cands:
-            # Retry without deduplication before failing the scene.
-            cands = _pexels_candidates(key, query, orientation)
-        if not cands:
+    if provider == "openverse":
+        candidates = [item for item in _openverse_candidates(query) if item.get("url") not in used]
+        if not candidates:
+            candidates = _openverse_candidates(query)
+        if not candidates:
             raise RuntimeError(
-                f"Pexels returned no usable portrait video/photo for scene {index + 1}: {query!r}. "
-                "Check the API key, rate limit, or broaden this scene's visual query."
+                f"Openverse returned no CC0 portrait-friendly image for scene {index + 1}: {query!r}. "
+                "Try a broader visual query; refusing to use a gradient placeholder."
             )
-        # Prefer video results and rotate through different clips for repeated queries.
-        kind, url = cands[index % len(cands)]
+        item = candidates[index % len(candidates)]
+        url = item["url"]
         used.add(url)
         digest = hashlib.sha1(url.encode()).hexdigest()[:16]
-        ext = ".mp4" if kind == "video" else ".jpg"
-        cached = _download(url, _cache_dir() / f"{digest}{ext}")
+        cached = _download(url, _cache_dir() / f"{digest}.jpg")
         if not cached.exists() or cached.stat().st_size < 10_000:
-            raise RuntimeError(f"Pexels asset download was incomplete: {url}")
-        store.bump_visual(digest)
-        if kind == "video":
-            return from_video(cfg, cached, seconds, out), f"pexels:{digest[:8]}"
-        return from_image(cfg, cached, seconds, out), f"pexels:{digest[:8]}"
-
+            raise RuntimeError(f"Openverse image download was incomplete or too small: {url}")
+        try:
+            with Image.open(cached) as check:
+                check.verify()
+        except Exception as exc:
+            cached.unlink(missing_ok=True)
+            raise RuntimeError(f"Openverse returned an invalid image for scene {index + 1}") from exc
+        store.bump_visual(f"openverse:{digest}")
+        return from_image(cfg, cached, seconds, out, motion), f"openverse:{digest[:8]}"
     if provider == "local":
         files = _local_files()
         if files:
