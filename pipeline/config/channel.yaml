@@ -74,8 +74,8 @@ captions:
 
 # ---- visuals --------------------------------------------------------------------
 visuals:
-  # AI-generated visuals only: local SDXL Turbo weights, no image search or stock picker.
-  # Generation runs locally on Apple Silicon (MPS) or CPU; first run downloads model weights.
+  # AI-generated visuals only: local Z-Image-Turbo via Apple MLX/MFLUX. No image search or stock picker.
+  # Run generation on the user's Apple Silicon Mac; do not use CPU-only cloud runners.
   provider: ai_cartoon
   require_ai_images: true       # applies when provider=ai_cartoon
   animate: true            # slow zoom/pan on stills; a slideshow is not a reel
@@ -89,12 +89,12 @@ visuals:
     no text, no words, no letters, no watermark, no logos
 
   # Local-only inference. No hosted image API, API key, quota, or image picker.
-  ai_backend: local_sd
+  ai_backend: mflux_z_image
   remote_fallbacks: false
-  local_model: stabilityai/sdxl-turbo
-  local_steps: 2           # turbo checkpoints: guidance 0.0, 1-4 steps
+  mflux_quantize: 4         # 4-bit quantization to reduce memory on 16 GB unified memory
+  local_steps: 9            # Z-Image-Turbo official example uses 9 scheduler steps (8 model forwards)
   ai_model: sana
-  # Conservative working size for 16 GB Apple Silicon; both axes must be /8.
+  # Conservative portrait working size for a 16 GB M4; dimensions are snapped to /16.
   ai_width: 512
   ai_height: 768
   ai_retries: 4
