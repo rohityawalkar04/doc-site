@@ -449,8 +449,15 @@ def _gen_cloudflare(cfg, prompt: str, seed: int, dest: Path) -> Path | None:
 
 def generate_image(cfg, query: str, seed: int, dest: Path) -> Path | None:
     """Generate one illustration. Cached on disk by seed, so re-renders are free."""
-    if dest.exists() and dest.stat().st_size > 5000:
-        return dest
+    if dest.exists():
+        try:
+            if dest.stat().st_size > 5_000:
+                with Image.open(dest) as cached:
+                    cached.verify()
+                return dest
+        except Exception as e:
+            print(f"    ! discarding invalid cached image {dest.name}: {e}")
+        dest.unlink(missing_ok=True)
 
     prompt = build_prompt(cfg, query)
     backend = cfg.get("visuals.ai_backend", "local_sd")
