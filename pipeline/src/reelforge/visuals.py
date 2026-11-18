@@ -189,8 +189,7 @@ def _pexels_candidates(key: str, query: str, orientation: str) -> list[tuple[str
             for v in r.json().get("videos", []):
                 files = sorted(
                     (f for f in v.get("video_files", []) if f.get("height", 0) >= 1280),
-                    key=lambda f: f.get("height", 0),
-                    reverse=True,
+                    key=lambda f: abs(f.get("height", 0) - 1920),
                 )
                 if files:
                     out.append(("video", files[0]["link"]))
