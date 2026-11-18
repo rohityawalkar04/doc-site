@@ -1,7 +1,7 @@
 """Cloud entry point: build one reel and publish it, on a machine with no GPU.
 
 Designed for GitHub Actions, where:
-  * there is no GPU and no model cache  -> images come from Cloudflare Workers AI
+  * there is no GPU and no model cache  -> visuals come from Pexels' free stock library
   * there is no local LLM               -> scripts come from the beats in topics.yaml
   * the filesystem is wiped each run    -> "what has been published" lives in a
                                           committed JSON ledger, not in sqlite
@@ -116,8 +116,14 @@ def main() -> int:
 
     cfg = config.load()
     cfg.override("script.mode", "beats")          # no LLM in CI
-    cfg.override("visuals.provider", "ai_cartoon")
-    cfg.override("visuals.ai_backend", os.environ.get("AI_BACKEND", "cloudflare"))
+    cfg.override("visuals.provider", "pexels")
+
+    # Stock visuals are required for every scene. Fail before rendering rather
+    # than silently producing gradient placeholders.
+    if not os.environ.get("PEXELS_API_KEY", "").strip():
+        print("::error title=Visual backend::PEXELS_API_KEY is required for free stock visuals")
+        return 1
+    print("preflight: Pexels stock visuals configured")
 
     # A build-only run publishes nothing, so it must not require publish
     # credentials. Demanding the YouTube token here is what failed the first
@@ -130,20 +136,6 @@ def main() -> int:
                 print(p)
             return 1
         print("preflight: YouTube token refreshes OK")
-
-    if not args.dry_run and cfg.get("visuals.ai_backend") == "cloudflare":
-        missing = [k for k in ("CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN")
-                   if not os.environ.get(k, "").strip()]
-        if missing:
-            msg = (
-                f"missing {', '.join(missing)}. Add them as repository secrets.\n"
-                "  Without them every scene falls back to procedural gradients.\n"
-                "  Cloudflare Workers AI: free 10,000 neurons/day, no card required."
-            )
-            print(f"::error title=Image backend::{msg.replace(chr(10), ' ')}")
-            print(msg)
-            return 1
-        print("preflight: Cloudflare Workers AI configured")
 
     # GitHub's schedule event is best-effort and can drop a run under load, so
     # the workflow fires more than once a day. This guard makes the retries free:
@@ -173,11 +165,6 @@ def main() -> int:
         print(f"\n=== {topic['id']} ===", flush=True)
         try:
             meta = pipeline.build(cfg, store, topic, keep_work=False)
-        except AiQuotaExhausted as e:
-            for line in str(e).splitlines():
-                print(line)
-            print("::error title=Image quota exhausted::" + str(e).splitlines()[0])
-            return 1
         except Exception as e:  # noqa: BLE001 - stop the batch, report clearly
             print(f"::error title=Build failed::{type(e).__name__}: {str(e).splitlines()[0][:300]}")
             print(f"\nSTOPPED on {topic['id']} after {len(ledger.load())} published.")
