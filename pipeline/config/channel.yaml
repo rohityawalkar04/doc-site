@@ -79,8 +79,7 @@ visuals:
   #           pexels     -> licensed stock video/images (needs PEXELS_API_KEY)
   #           local      -> whatever you drop in assets/broll/
   provider: ai_cartoon
-  require_ai_images: true       # never publish gradient placeholders as finished reels
-  cloud_no_local_fallback: true # CI has no GPU; fail fast instead of running SDXL on CPU
+  require_ai_images: true       # applies when provider=ai_cartoon
   animate: true            # slow zoom/pan on stills; a slideshow is not a reel
 
   # Appended to every scene's visual_query. Flat illustration asks the model for
@@ -95,8 +94,8 @@ visuals:
   # Empirical limits of the free tier (Nov 2026): model flux returns 402,
   # sana works but is throttled so hard that ~1 in 5 requests succeeds. It is a
   # fallback, not the default.
-  ai_backend: local_sd     # local_sd | pollinations | cloudflare
-  remote_fallbacks: false  # true enables quota-limited hosted fallbacks after local failure
+  ai_backend: local_sd     # local-only backend for optional local AI mode
+  remote_fallbacks: false  # hosted AI providers are deliberately disabled
   local_model: stabilityai/sdxl-turbo
   local_steps: 2           # turbo checkpoints: guidance 0.0, 1-4 steps
   ai_model: sana
