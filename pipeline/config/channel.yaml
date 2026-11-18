@@ -78,7 +78,11 @@ visuals:
   #           ai_cartoon -> free AI illustrations (Pollinations), animated
   #           pexels     -> licensed stock video/images (needs PEXELS_API_KEY)
   #           local      -> whatever you drop in assets/broll/
-  provider: ai_cartoon
+  # provider: openverse -> openly licensed CC0 images; anonymous API, no key
+  #           ai_cartoon -> local AI illustrations (requires SDXL + diffusers)
+  #           local      -> files dropped into assets/broll/
+  #           procedural -> gradients for preview/testing only
+  provider: openverse
   require_ai_images: true       # applies when provider=ai_cartoon
   animate: true            # slow zoom/pan on stills; a slideshow is not a reel
 
