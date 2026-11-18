@@ -451,14 +451,16 @@ def generate_image(cfg, query: str, seed: int, dest: Path) -> Path | None:
     backend = cfg.get("visuals.ai_backend", "local_sd")
 
     # In CI there is no GPU and no model cache, so hosted is tried first.
+    remote_fallbacks = bool(cfg.get("visuals.remote_fallbacks", False))
+    # Local mode is genuinely local by default. Hosted free tiers are optional:
+    # they are quota-limited and may change without notice.
     order = {
-        "local_sd": [_gen_local, _gen_cloudflare, _gen_pollinations],
-                # No pollinations for the cloud backend: it is throttled to ~1 in 5
-        # and costs ~60s per image in retries before falling back, which
-        # reads as a frozen build.
+        "local_sd": [_gen_local] + ([_gen_cloudflare, _gen_pollinations] if remote_fallbacks else []),
+        # No pollinations for the cloud backend: it is throttled and can make a
+        # build appear frozen while retries wait.
         "cloudflare": [_gen_cloudflare, _gen_local],
         "pollinations": [_gen_pollinations, _gen_cloudflare, _gen_local],
-    }.get(backend, [_gen_local, _gen_cloudflare, _gen_pollinations])
+    }.get(backend, [_gen_local] + ([_gen_cloudflare, _gen_pollinations] if remote_fallbacks else []))
 
     providers = {
         _gen_local: "local_sd",
