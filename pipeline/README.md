@@ -40,7 +40,7 @@ open out/*.mp4
 |---|---|---|---|
 | Script | Ollama Qwen2.5 7B | Ollama Gemma 3 4B → topic beat sheet | Local |
 | Voice | Kokoro | Piper | Local, offline after model download |
-| Visuals | SDXL Turbo | procedural/local assets; optional hosted providers | Local by default |
+| Visuals | Local SDXL Turbo | required AI generation; no stock/image search fallback | Local or CPU runner |
 | Render | FFmpeg + Pillow | — | Local |
 | Publish | YouTube / Meta APIs | — | Internet and platform quotas apply |
 
@@ -87,10 +87,7 @@ at a time). SDXL may be memory- or time-intensive on this configuration; if it
 causes memory pressure, reduce `visuals.ai_width` / `visuals.ai_height` or switch
 to a smaller compatible checkpoint after testing quality.
 
-The local-first configuration sets `visuals.remote_fallbacks: false`. That means
-a local image failure degrades to the existing procedural/local asset path rather
-than silently consuming a hosted free quota. You can opt into hosted fallback
-providers explicitly, but their quotas are not unlimited.
+The visual pipeline is intentionally local-only: each scene is generated from its prompt using SDXL Turbo. There is no stock-image search, image picker, hosted inference API, or API key. If image generation fails, the render fails rather than silently substituting a gradient.
 
 ## Configuration
 
@@ -102,7 +99,7 @@ script.min_scenes          # 9-11 scenes of 10-14 words ≈ 35 s
 llm.models                 # ordered Ollama model fallback list
 voice.engine               # kokoro (primary) | piper (offline fallback)
 voice.name                 # en-US-AndrewNeural, en-IN-PrabhatNeural, ...
-visuals.provider           # procedural | pexels | local
+visuals.provider           # ai_cartoon (local SDXL Turbo only)
 captions.mode              # auto | ass | png
 audio.target_lufs          # -16; both platforms normalise, quiet loses
 publish.youtube.privacy    # public | unlisted | private
@@ -112,40 +109,19 @@ publish.youtube.privacy    # public | unlisted | private
 (tracked in `work/reelforge.db`). Add topics; the `beats` list is the offline
 fallback and is used verbatim, so write it well.
 
-## Visual providers
+## Visual generation
 
-| provider | needs | when |
-|---|---|---|
-| `ai_cartoon` | `pip install -r requirements-ai.txt` (local SD) | default; AI illustrations, animated with zoom/pan |
-| `procedural` | nothing | zero-dependency fallback; looks identical across videos |
-| `pexels` | `PEXELS_API_KEY` (free, 200 req/h) | real licensed b-roll |
-| `local` | files in `assets/broll/` | your own footage |
+The only configured visual provider is `ai_cartoon`, backed by local Stable Diffusion XL Turbo (`stabilityai/sdxl-turbo`) through Diffusers. It runs on Apple Silicon MPS when available and CPU otherwise. Install the model dependencies with `pip install -r requirements-ai.txt`; the first run downloads the model weights. Images are cached in `assets/cache/ai/<seed>.jpg`, so rerenders reuse generated scenes.
 
-### AI illustrations
+The channel uses cinematic-realism prompts, one generated image per scene, and slow alternating zoom/pan motion. `visuals.require_ai_images: true` prevents a failed generation from becoming a gradient placeholder. Remote image services and image-search providers are not used by the active pipeline.
 
-`ai_cartoon` runs local Stable Diffusion (`stabilityai/sdxl-turbo`) on Apple
-Silicon MPS at the configured 512×768 working resolution. The first run downloads
-the checkpoint. With `visuals.remote_fallbacks: false` (default), no hosted image
-service is contacted; a local generation failure falls back to the pipeline's
-existing procedural/local visual path.
-
-Set `visuals.remote_fallbacks: true` only if you explicitly want Cloudflare and
-Pollinations attempted after local failure. Their free allocations are finite,
-rate-limited, and can change; quota exhaustion is remembered for a cooldown so
-the same unavailable provider is not hammered once per scene.
-
-Every illustration is cached in `assets/cache/ai/<seed>.jpg`, so re-rendering a
-reel costs no generation time.
+The model is open-weight and locally runnable, but its Stability AI Community License is not the same as an OSI-approved open-source software license. Review the model license and its commercial-use terms before monetizing at scale. The pipeline code and dependencies remain separate from the model weights.
 
 ### Animation
 
 `visuals.animate: true` applies a different slow motion to each scene — push in,
 pull out, pan left, pan right, cycled. Static stills in sequence read as a
 slideshow; alternating motion is what makes it read as video.
-
-Pexels is the one to switch to before publishing anything real. Procedural
-gradients across 50 reels is exactly the "mass-produced low-value" pattern that
-platforms demote.
 
 ## Music
 
@@ -293,13 +269,12 @@ Measured end-to-end: **5 reels (10 scenes each, ~35 s) in ~19 minutes**, versus
 The problem with scheduling this on a laptop: `launchd` does not fire if the Mac
 is asleep, and a closed laptop is a channel that silently stops posting.
 
-The free answer is **GitHub Actions + Cloudflare Workers AI**. No VPS, no GPU, no
-card, no machine at home.
+The cloud workflow uses **GitHub Actions with local CPU inference**. It does not call a hosted image API. Model weights are cached between runs, but the first run downloads them and CPU image generation is slower than a local GPU.
 
 | Piece | Service | Free allowance |
 |---|---|---|
 | Schedule + compute | GitHub Actions | unmetered **on public repos** |
-| Images | Cloudflare Workers AI (`flux-1-schnell`) | 10,000 Neurons/day, no card (~200 images) |
+| Images | Local SDXL Turbo on GitHub runner CPU | No image API key or per-image fee; CPU time applies |
 | Voice | `edge-tts` | unlimited |
 | Render | ffmpeg on the runner | CPU only, fine |
 | Publish | YouTube + Meta APIs | 6 YT uploads/day, 25 IG posts/day |
