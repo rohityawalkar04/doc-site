@@ -140,7 +140,7 @@ jobs:
         run: |
           PYTHONPATH=src python -u scripts/cloud_run.py \
             --count "${{ github.event.inputs.count || '1' }}" \
-            ${{ github.event_name == 'schedule' || github.event.inputs.mode == 'dry-run' ? '--dry-run' : '' }}
+            ${{ (github.event_name == 'schedule' || github.event.inputs.mode == 'dry-run') && '--dry-run' || '' }}
 
       # Runs even on failure: if a future explicit publish succeeds before an error,
       # its ledger entry must still be recorded.
