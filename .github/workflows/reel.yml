@@ -15,7 +15,7 @@ on:
     inputs:
       count:
         description: "how many reels; 0 = keep going until something fails"
-        default: "0"
+        default: "1"
       mode:
         description: "publish, or rehearse without uploading"
         type: choice
@@ -143,7 +143,7 @@ jobs:
           PYTHONUNBUFFERED: "1"
         run: |
           PYTHONPATH=src python -u scripts/cloud_run.py \
-            --count "${{ github.event.inputs.count || '0' }}" \
+            --count "${{ github.event.inputs.count || '1' }}" \
             ${{ github.event.inputs.mode == 'dry-run' && '--dry-run' || '' }}
 
       # Runs even on failure: a reel published before the error must still be

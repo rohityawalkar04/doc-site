@@ -19,6 +19,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 import requests
+from PIL import Image
 
 from . import fallback
 
@@ -448,8 +449,15 @@ def _gen_cloudflare(cfg, prompt: str, seed: int, dest: Path) -> Path | None:
 
 def generate_image(cfg, query: str, seed: int, dest: Path) -> Path | None:
     """Generate one illustration. Cached on disk by seed, so re-renders are free."""
-    if dest.exists() and dest.stat().st_size > 5000:
-        return dest
+    if dest.exists():
+        try:
+            if dest.stat().st_size > 5_000:
+                with Image.open(dest) as cached:
+                    cached.verify()
+                return dest
+        except Exception as e:
+            print(f"    ! discarding invalid cached image {dest.name}: {e}")
+        dest.unlink(missing_ok=True)
 
     prompt = build_prompt(cfg, query)
     backend = cfg.get("visuals.ai_backend", "local_sd")
@@ -458,11 +466,11 @@ def generate_image(cfg, query: str, seed: int, dest: Path) -> Path | None:
     remote_fallbacks = bool(cfg.get("visuals.remote_fallbacks", False))
     # Local mode is genuinely local by default. Hosted free tiers are optional:
     # they are quota-limited and may change without notice.
+    cloud_no_local = bool(cfg.get("visuals.cloud_no_local_fallback", False))
     order = {
         "local_sd": [_gen_local] + ([_gen_cloudflare, _gen_pollinations] if remote_fallbacks else []),
-        # No pollinations for the cloud backend: it is throttled and can make a
-        # build appear frozen while retries wait.
-        "cloudflare": [_gen_cloudflare, _gen_local],
+        # Hosted CI has no GPU. Do not download/run SDXL on CPU when Cloudflare fails.
+        "cloudflare": [_gen_cloudflare] if cloud_no_local else [_gen_cloudflare, _gen_local],
         "pollinations": [_gen_pollinations, _gen_cloudflare, _gen_local],
     }.get(backend, [_gen_local] + ([_gen_cloudflare, _gen_pollinations] if remote_fallbacks else []))
 
@@ -479,16 +487,25 @@ def generate_image(cfg, query: str, seed: int, dest: Path) -> Path | None:
         try:
             img = gen(cfg, prompt, seed, dest)
         except AiQuotaExhausted as e:
-            # Quota exhaustion is account-wide, not scene-specific. Stop calling
-            # this provider for the rest of the reset window and use the next one.
+            # Quota exhaustion is account-wide. Stop before a placeholder reel can publish.
             fallback.disable(provider_name, str(e), seconds=86400)
-            print(f"    ! {provider_name} quota exhausted; switching provider")
-            continue
+            print(f"    ! {provider_name} quota exhausted; stopping image generation")
+            raise
         except Exception as e:
             fallback.disable(provider_name, f"{type(e).__name__}: {e}", seconds=900)
             print(f"    ! {provider_name} failed; cooling down for 15 minutes: {e}")
             continue
         if img is not None:
+            try:
+                if not img.exists() or img.stat().st_size < 5_000:
+                    raise ValueError("generated image is missing or too small")
+                with Image.open(img) as check:
+                    check.verify()
+            except Exception as e:
+                img.unlink(missing_ok=True)
+                fallback.disable(provider_name, f"invalid image: {e}", seconds=900)
+                print(f"    ! {provider_name} returned an invalid image: {e}")
+                continue
             fallback.enable(provider_name)
             return img
     return None
@@ -522,7 +539,12 @@ def for_scene(cfg, store, index: int, seconds: float, query: str, out: Path,
         if img is not None:
             store.bump_visual(f"ai:{seed:08x}")
             return from_image(cfg, img, seconds, out, motion), f"ai:{seed:08x}"
-        print("    ! AI image unavailable after retries, using procedural")
+        if cfg.get("visuals.require_ai_images", True):
+            raise RuntimeError(
+                f"required AI image unavailable for scene {index + 1}: {query!r}; "
+                "refusing to render a gradient placeholder"
+            )
+        print("    ! AI image unavailable after retries, using procedural (explicitly allowed)")
 
     if provider == "pexels":
         key = os.environ.get("PEXELS_API_KEY", "").strip()

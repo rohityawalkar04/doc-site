@@ -23,11 +23,13 @@ script:
   # Instagram/YouTube ask for 30-60s. ~3 words/second at this voice's pace, so
   # 10-12 scenes of 8-14 words lands at 28-40s. Prefer more scenes over longer
   # scenes: a model asked to write longer lines pads, and padding kills retention.
-  min_scenes: 13
-  max_scenes: 14
-  words_per_scene: [8, 14]
-  target_seconds: 50
-  min_seconds: 45
+  # Retention-first Shorts: hook, concise middle, and a useful close.
+  min_scenes: 9
+  max_scenes: 9
+  beats_max_scenes: 9
+  words_per_scene: [7, 12]
+  target_seconds: 36
+  min_seconds: 30
   words_per_second: 2.9   # measured for en-US-AndrewNeural at rate +0%
   attempts: 2
 
@@ -59,7 +61,7 @@ captions:
   # Phrase cards, as used on the-five-minute-rule. "all" or "hook" re-enable
   # word-by-word highlighting, at ~2.5x the overlay count.
   per_word: false
-  accent_hook: false
+  accent_hook: true
   max_words_per_line: 3
   max_chars_per_line: 20
   primary: "&H004DD8FF"     # ASS &HAABBGGRR - spoken word colour (warm yellow)
@@ -77,6 +79,8 @@ visuals:
   #           pexels     -> licensed stock video/images (needs PEXELS_API_KEY)
   #           local      -> whatever you drop in assets/broll/
   provider: ai_cartoon
+  require_ai_images: true       # never publish gradient placeholders as finished reels
+  cloud_no_local_fallback: true # CI has no GPU; fail fast instead of running SDXL on CPU
   animate: true            # slow zoom/pan on stills; a slideshow is not a reel
 
   # Appended to every scene's visual_query. Flat illustration asks the model for
