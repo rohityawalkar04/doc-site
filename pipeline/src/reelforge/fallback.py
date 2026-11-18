@@ -30,7 +30,11 @@ def _write(data: dict) -> None:
 
 def available(provider: str) -> bool:
     item = _read().get(provider, {})
-    return float(item.get("disabled_until", 0)) <= time.time()
+    try:
+        return float(item.get("disabled_until", 0)) <= time.time()
+    except (TypeError, ValueError):
+        # A hand-edited or partially migrated state file must not stop a reel.
+        return True
 
 
 def disable(provider: str, reason: str, seconds: int = 86400) -> None:
