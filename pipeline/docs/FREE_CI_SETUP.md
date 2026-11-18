@@ -5,7 +5,7 @@ The hosted workflow uses only zero-cost components for the build:
 | Stage | Tool | Cost |
 |---|---|---|
 | Workflow + CPU rendering | GitHub Actions hosted Ubuntu runner | Free-tier allowance |
-| Visuals | Openverse anonymous API (CC0 images) | Free API access, subject to Pexels limits |
+| Visuals | Openverse anonymous API (CC0 images) | Free API access, subject to anonymous rate limits |
 | Voice | Piper TTS (en_US-ryan-high) | Open source; model downloaded/cached |
 | Captions + video | Pillow + FFmpeg | Open source |
 | Script | Curated beats in config/topics.yaml | No inference API |
@@ -15,10 +15,7 @@ The hosted workflow uses only zero-cost components for the build:
 
 ## One-time setup
 
-1. Create a free Pexels account and request an API key at https://www.pexels.com/api/.
-2. In GitHub, open **Settings → Secrets and variables → Actions → New repository secret**.
-3. Add `PEXELS_API_KEY` with the key from Pexels.
-4. No Cloudflare account or Cloudflare secrets are needed.
+No API key or repository secret is needed for visuals. Openverse supports anonymous API requests, subject to rate limits. The pipeline searches CC0-only images to avoid attribution requirements for monetized Shorts. No Cloudflare or Pexels secrets are needed.
 
 For a preview, open **Actions → reel → Run workflow**, leave mode as **dry-run**, and set count to **1**. This builds one MP4 and uploads it as the `reels` artifact; it does not publish to YouTube or Meta.
 
