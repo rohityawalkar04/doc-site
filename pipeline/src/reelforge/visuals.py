@@ -271,7 +271,8 @@ def _gen_local(cfg, prompt: str, seed: int, dest: Path) -> Path | None:
     try:
         pipe, torch, device = _local_pipe(cfg)
     except Exception as e:
-        print(f"    ! local diffusion unavailable ({type(e).__name__}: {e})")
+        fallback.disable("local_sd", f"{type(e).__name__}: {e}", seconds=3600)
+        print(f"    ! local diffusion unavailable ({type(e).__name__}: {e}); cooling down for 1 hour")
         return None
 
     w = int(cfg.get("visuals.ai_width", 832))
@@ -291,7 +292,10 @@ def _gen_local(cfg, prompt: str, seed: int, dest: Path) -> Path | None:
             generator=gen,
         ).images[0]
     except Exception as e:
-        print(f"    ! local generation failed ({type(e).__name__}: {e})")
+        # OOM / backend failures are usually machine-wide for this run. Avoid
+        # repeating the same expensive failure for every remaining scene.
+        fallback.disable("local_sd", f"{type(e).__name__}: {e}", seconds=900)
+        print(f"    ! local generation failed ({type(e).__name__}: {e}); cooling down for 15 minutes")
         return None
     image.save(dest, quality=95)
     return dest
