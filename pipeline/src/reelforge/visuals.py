@@ -10,31 +10,15 @@ from __future__ import annotations
 
 import hashlib
 import os
-import re
 import random
 import shutil
 import subprocess
 import sys
-import time
 from pathlib import Path
-from urllib.parse import quote
 
-import requests
 from PIL import Image
 
 from . import fallback
-
-OPENVERSE_IMAGES = "https://api.openverse.org/v1/images/"
-POLLINATIONS = "https://image.pollinations.ai/prompt/{prompt}"
-
-
-class AiQuotaExhausted(RuntimeError):
-    """Raised when the image backend has no allocation left.
-
-    Deliberately fatal: carrying on fills the reel with gradient placeholders,
-    which wastes the whole run and looks broken on a channel that publishes
-    illustrations.
-    """
 
 # Zoom/pan variants, cycled per scene. A reel where every shot pushes in at the
 # same speed reads as static even though it is moving.
@@ -167,80 +151,6 @@ def from_image(cfg, src: Path, seconds: float, out: Path, motion: str = "in") ->
     return out
 
 
-# --------------------------------------------------------------------------- pexels
-def _cache_dir() -> Path:
-    p = Path(os.environ.get("REELFORGE_ROOT", ".")) / "assets" / "cache" / "openverse"
-    p.mkdir(parents=True, exist_ok=True)
-    return p
-
-
-def _openverse_candidates(query: str) -> list[dict]:
-    """Search Openverse anonymously for CC0 images with progressively broader terms.
-
-    Search relevance is retained by trying the full visual prompt first, then
-    concise keyword combinations, and finally the main subject. No orientation
-    or size filter is applied because valid CC0 sources are cropped to 9:16 by
-    from_image(). CC0 avoids attribution obligations for monetized Shorts.
-    """
-    words = re.findall(r"[a-zA-Z]{3,}", query.lower())
-    stop = {
-        "the", "and", "with", "from", "into", "over", "under", "three", "four",
-        "two", "one", "spilled", "open", "dark", "bright", "small", "large",
-        "empty", "broken", "old", "new", "close", "closeup", "close-up",
-    }
-    keywords = [word for word in words if word not in stop]
-    candidates_to_try = [
-        query.strip(),
-        " ".join(keywords),
-        " ".join(keywords[-2:]),
-        keywords[-1] if keywords else "",
-    ]
-    queries = list(dict.fromkeys(q[:200] for q in candidates_to_try if q))
-    for search_query in queries:
-        try:
-            r = requests.get(
-                OPENVERSE_IMAGES,
-                params={"q": search_query, "license": "cc0", "page_size": 20},
-                headers={"User-Agent": "ReelForge/1.0 (openverse anonymous media search)"},
-                timeout=30,
-            )
-            if r.status_code == 429:
-                raise RuntimeError("Openverse anonymous API rate limit reached; retry later")
-            r.raise_for_status()
-            candidates = [
-                item for item in r.json().get("results", [])
-                if item.get("url", "").startswith("https://")
-                and item.get("license", "").lower() == "cc0"
-            ]
-            if candidates:
-                return candidates
-        except requests.HTTPError as exc:
-            response = exc.response
-            status = response.status_code if response is not None else "unknown"
-            detail = (response.text or "")[:500] if response is not None else ""
-            request_id = ""
-            if response is not None:
-                request_id = response.headers.get("x-request-id") or response.headers.get("cf-ray") or ""
-            suffix = f"; request_id={request_id}" if request_id else ""
-            raise RuntimeError(
-                f"Openverse image search failed ({status}): {exc}; "
-                f"response={detail!r}{suffix}"
-            ) from exc
-        except requests.RequestException as exc:
-            raise RuntimeError(f"Openverse image search failed: {exc}") from exc
-    return []
-
-def _download(url: str, dest: Path) -> Path:
-    if dest.exists() and dest.stat().st_size > 10_000:
-        return dest
-    with requests.get(url, stream=True, timeout=120) as r:
-        r.raise_for_status()
-        with open(dest, "wb") as f:
-            for chunk in r.iter_content(1 << 16):
-                f.write(chunk)
-    return dest
-
-
 # --------------------------------------------------------------------------- ai images
 def _ai_cache() -> Path:
     p = Path(os.environ.get("REELFORGE_ROOT", ".")) / "assets" / "cache" / "ai"
@@ -289,151 +199,6 @@ def _gen_mflux_z_image(cfg, prompt: str, seed: int, dest: Path) -> Path | None:
     image.save(str(dest))
     return dest
 
-def _gen_pollinations(cfg, prompt: str, seed: int, dest: Path) -> Path | None:
-    """Free image generation via Pollinations.
-
-    Empirically (Nov 2026): `flux` returns 402, `sana` works but is throttled so
-    hard that ~1 in 5 requests succeeds. Kept as a secondary backend only.
-    """
-    w = min(int(cfg.get("visuals.ai_width", 1024)), int(cfg.get("visuals.width", 1080)))
-    h = min(int(cfg.get("visuals.ai_height", 1792)), int(cfg.get("visuals.height", 1920)))
-    params = {
-        "width": w,
-        "height": h,
-        "seed": seed,
-        "model": cfg.get("visuals.ai_model", "sana"),
-        "nologo": "true",
-        "enhance": "false",
-    }
-    url = POLLINATIONS.format(prompt=quote(prompt))
-    retries = int(cfg.get("visuals.ai_retries", 4))
-    backoff = float(cfg.get("visuals.ai_backoff", 5))
-    timeout = int(cfg.get("visuals.ai_timeout", 120))
-
-    for attempt in range(retries):
-        try:
-            r = requests.get(url, params=params, timeout=timeout)
-            if r.status_code == 200 and len(r.content) > 5000:
-                dest.write_bytes(r.content)
-                return dest
-            # 402 here means "throttled on the anonymous tier", not "pay up".
-        except requests.RequestException:
-            pass
-        if attempt < retries - 1:
-            time.sleep(backoff * (attempt + 1) * 0.5)
-    return None
-
-
-RISKY_WORDS = {"hand", "hands", "fingers", "palm", "body", "flesh", "skin", "nude", "bare"}
-FRAME = "children's storybook illustration, flat vector, wholesome, plain background: "
-
-
-def _framed(prompt: str) -> str:
-    """Wrap the prompt so a safety classifier reads it as illustration.
-
-    Adding explicit benign context works far better than deleting words - deleting
-    "hand" from "a hand receiving a coin" removes the subject and you get nonsense.
-    """
-    return FRAME + prompt
-
-
-def _sanitise_prompt(prompt: str) -> str:
-    """Last resort: benign framing plus the words most likely to trip a filter."""
-    kept = [w for w in prompt.split() if w.strip(",.!?").lower() not in RISKY_WORDS]
-    text = " ".join(kept)
-    # tidy artefacts left by removing a word ("a a" / leading article before a verb)
-    text = re.sub(r"\b(a|an|the)\s+(?=(a|an|the)\b)", "", text)
-    text = re.sub(r"\s{2,}", " ", text).strip()
-    return _framed(text)
-
-
-def _gen_cloudflare(cfg, prompt: str, seed: int, dest: Path) -> Path | None:
-    """Free hosted images: Cloudflare Workers AI, flux-1-schnell.
-
-    Workers Free gives 10,000 Neurons/day with no card. At roughly 45 Neurons an
-    image that is ~200 images/day, so a 13-scene reel costs ~6% of the allowance.
-    This is the backend that lets rendering run in CI, where there is no GPU.
-    """
-    import base64
-
-    acct = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "").strip()
-    token = os.environ.get("CLOUDFLARE_API_TOKEN", "").strip()
-    if not acct or not token:
-        print("    ! CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN not set")
-        return None
-
-    model = cfg.get("visuals.cf_model", "@cf/black-forest-labs/flux-1-schnell")
-
-    # flux-1-schnell accepts ONLY prompt and steps. Sending width/height/seed
-    # returns "Additional or unevaluated properties ... not allowed" (code 5006).
-    # It also always renders a square, which from_image crops to 9:16 - hence the
-    # style prompt asks for a centred subject in a vertical composition.
-    payload = {
-        "prompt": prompt,
-        "steps": min(int(cfg.get("visuals.cf_steps", 4)), 8),  # flux-schnell caps at 8
-    }
-    url = f"https://api.cloudflare.com/client/v4/accounts/{acct}/ai/run/{model}"
-
-    # flux-1-schnell's safety filter false-positives on dull, benign prompts
-    # ("a hand receiving a single gold coin" was rejected as NSFW). Retrying the
-    # identical prompt cannot help, so rephrase and try again before giving up -
-    # a gradient scene next to twelve illustrations looks broken.
-    attempts = [payload, {**payload, "prompt": _framed(prompt)}]
-    soft = _sanitise_prompt(prompt)
-    if soft not in (prompt, attempts[1]["prompt"]):
-        attempts.append({**payload, "prompt": soft})
-
-    for attempt, body in enumerate(attempts, 1):
-        try:
-            r = requests.post(
-                url,
-                headers={"Authorization": f"Bearer {token}"},
-                json=body,
-                timeout=int(cfg.get("visuals.cf_timeout", 180)),
-            )
-        except requests.RequestException as e:
-            print(f"    ! cloudflare request failed: {e}")
-            continue
-        if r.status_code == 200:
-            break
-        try:
-            msg = str(r.json().get("errors"))[:180]
-        except ValueError:
-            msg = r.text[:180]
-        nsfw = "NSFW" in msg or "8007" in msg
-        if "free allocation" in msg or "upgrade to Cloudflare" in msg:
-            raise AiQuotaExhausted(
-                "Cloudflare Workers AI daily allocation exhausted (10,000 neurons).\n"
-                "  Resets at 00:00 UTC = 05:30 IST.\n"
-                "  Builds are the cost: every run regenerates all 13 images unless the\n"
-                "  cache is warm, so repeated rebuilds burn the day's allowance."
-            )
-        print(f"    ! cloudflare {r.status_code} (attempt {attempt}/{len(attempts)})"
-              f"{' - safety filter' if nsfw else ''}: {msg}")
-        if r.status_code == 429 or r.status_code >= 500:
-            time.sleep(2 * attempt)
-
-    ctype = r.headers.get("content-type", "")
-    if r.status_code == 200 and ctype.startswith("image/"):
-        dest.write_bytes(r.content)          # some models stream raw bytes
-        return dest
-
-    try:
-        body = r.json()
-    except ValueError:
-        print(f"    ! cloudflare {r.status_code}: {r.text[:200]}")
-        return None
-    if r.status_code != 200 or not body.get("success", False):
-        print(f"    ! cloudflare {r.status_code}: {str(body.get('errors'))[:200]}")
-        return None
-    b64 = (body.get("result") or {}).get("image")
-    if not b64:
-        print(f"    ! cloudflare returned no image: {str(body)[:200]}")
-        return None
-    dest.write_bytes(base64.b64decode(b64))
-    return dest
-
-
 def generate_image(cfg, query: str, seed: int, dest: Path) -> Path | None:
     """Generate one local AI image. Cached on disk by seed, so rerenders are free."""
     if dest.exists():
@@ -470,80 +235,29 @@ def generate_image(cfg, query: str, seed: int, dest: Path) -> Path | None:
         raise RuntimeError(f"Local Z-Image-Turbo generation failed: {e}") from e
 
 
-# --------------------------------------------------------------------------- local
-def _local_files() -> list[Path]:
-    root = Path(os.environ.get("REELFORGE_ROOT", "."))
-    d = root / "assets" / "broll"
-    if not d.exists():
-        return []
-    exts = {".mp4", ".mov", ".m4v", ".jpg", ".jpeg", ".png", ".webp"}
-    return sorted(p for p in d.iterdir() if p.suffix.lower() in exts)
-
-
 # --------------------------------------------------------------------------- entry point
 def for_scene(cfg, store, index: int, seconds: float, query: str, out: Path,
               used: set[str] | None = None) -> tuple[Path, str]:
-    provider = cfg.get("visuals.provider", "procedural")
-    orientation = cfg.get("visuals.pexels_orientation", "portrait")
-    used = used if used is not None else set()
+    """Render a scene using locally generated AI imagery only."""
+    provider = cfg.get("visuals.provider", "ai_cartoon")
+    if provider not in ("ai_cartoon", "ai"):
+        raise RuntimeError(
+            f"Visual provider {provider!r} is disabled. Gita & Grit uses only "
+            "local MFLUX Z-Image-Turbo generation; image search and stock pickers are removed."
+        )
+
     animate = bool(cfg.get("visuals.animate", True))
     motion = MOTIONS[index % len(MOTIONS)] if animate else "in"
-
-    if provider in ("ai_cartoon", "ai"):
-        # Seed from query + position: distinct image per scene even when two
-        # scenes share a visual_query, but stable across re-renders.
-        seed = int(hashlib.sha1(f"{query}|{index}".encode()).hexdigest()[:8], 16)
-        dest = _ai_cache() / f"{seed:08x}.jpg"
-        img = generate_image(cfg, query, seed, dest)
-        if img is not None:
-            store.bump_visual(f"ai:{seed:08x}")
-            return from_image(cfg, img, seconds, out, motion), f"ai:{seed:08x}"
-        if cfg.get("visuals.require_ai_images", True):
-            raise RuntimeError(
-                f"required AI image unavailable for scene {index + 1}: {query!r}; "
-                "refusing to render a gradient placeholder"
-            )
-        print("    ! AI image unavailable after retries, using procedural (explicitly allowed)")
-
-    if provider == "openverse":
-        candidates = [item for item in _openverse_candidates(query) if item.get("url") not in used]
-        if not candidates:
-            candidates = _openverse_candidates(query)
-        if not candidates:
-            raise RuntimeError(
-                f"Openverse returned no CC0 portrait-friendly image for scene {index + 1}: {query!r}. "
-                "Try a broader visual query; refusing to use a gradient placeholder."
-            )
-        item = candidates[index % len(candidates)]
-        url = item["url"]
-        used.add(url)
-        digest = hashlib.sha1(url.encode()).hexdigest()[:16]
-        cached = _download(url, _cache_dir() / f"{digest}.jpg")
-        if not cached.exists() or cached.stat().st_size < 10_000:
-            raise RuntimeError(f"Openverse image download was incomplete or too small: {url}")
-        try:
-            with Image.open(cached) as check:
-                check.verify()
-        except Exception as exc:
-            cached.unlink(missing_ok=True)
-            raise RuntimeError(f"Openverse returned an invalid image for scene {index + 1}") from exc
-        store.bump_visual(f"openverse:{digest}")
-        return from_image(cfg, cached, seconds, out, motion), f"openverse:{digest[:8]}"
-    if provider == "local":
-        files = _local_files()
-        if files:
-            # Least-used file first: stops the same clip appearing in every reel.
-            files.sort(key=lambda p: (store.visual_uses(p.name), p.name))
-            src = next((f for f in files if f.name not in used), files[0])
-            used.add(src.name)
-            store.bump_visual(src.name)
-            if src.suffix.lower() in {".mp4", ".mov", ".m4v"}:
-                return from_video(cfg, src, seconds, out), f"local:{src.name}"
-            return from_image(cfg, src, seconds, out), f"local:{src.name}"
-        print("    ! assets/broll/ is empty, using procedural")
-
-    return procedural(cfg, index, seconds, out), "procedural"
-
+    seed = int(hashlib.sha1(f"{query}|{index}".encode()).hexdigest()[:8], 16)
+    dest = _ai_cache() / f"{seed:08x}.jpg"
+    img = generate_image(cfg, query, seed, dest)
+    if img is None:
+        raise RuntimeError(
+            f"required local AI image unavailable for scene {index + 1}: {query!r}; "
+            "refusing to render a gradient placeholder"
+        )
+    store.bump_visual(f"ai:{seed:08x}")
+    return from_image(cfg, img, seconds, out, motion), f"ai:{seed:08x}"
 
 def ffmpeg_available() -> bool:
     return shutil.which("ffmpeg") is not None and shutil.which("ffprobe") is not None
