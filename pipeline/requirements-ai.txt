@@ -1,16 +1,7 @@
-# Optional: local AI illustration backend (free, offline, unlimited).
-# On macOS the torch wheel is ~70 MB, not the multi-GB CUDA build.
-torch>=2.2
-torchvision>=0.17
-diffusers>=0.27
-transformers>=4.40
-accelerate>=0.30
-safetensors>=0.4
+# Install on Apple Silicon only. MFLUX uses Apple's MLX runtime for local inference.
+# The Z-Image-Turbo weights are downloaded on first generation and stay on this Mac.
+mflux>=0.23.0; platform_system == "Darwin" and platform_machine == "arm64"
 
-# First run downloads the checkpoint (~6.9 GB for sdxl-turbo) into
-# ~/.cache/huggingface. Set visuals.local_model in config/channel.yaml to change it.
-
-# Optional local voice engine (Apache-2.0). Piper remains the lightweight
-# offline fallback and is already installed by requirements.txt.
+# Optional local voice engine (Apache-2.0).
 kokoro>=0.9
 soundfile>=0.12
