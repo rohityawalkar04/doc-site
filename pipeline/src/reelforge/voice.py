@@ -22,6 +22,7 @@ import requests
 RETRIES = 6
 SCENE_GAP = 0.45  # the endpoint rate-limits hard; a small gap is cheaper than a retry
 ATTEMPT_TIMEOUT = 70  # seconds; a hung request must never block the reel
+_KOKORO_PIPE = None
 
 
 async def _edge_once(text: str, voice: str, rate: str, pitch: str, out_path: Path) -> list[dict]:
@@ -111,31 +112,49 @@ def _piper_scene(text: str, model: Path, out_path: Path) -> list[dict]:
 def synthesise(cfg, scenes: list[dict], audio_dir: Path) -> list[dict]:
     """Writes one audio file per scene. Returns scenes with audio_path + words."""
     audio_dir.mkdir(parents=True, exist_ok=True)
-    engine = cfg.get("voice.engine", "edge")
+    engine = cfg.get("voice.engine", "kokoro")
     voice = cfg.get("voice.name", "en-US-AndrewNeural")
     rate = cfg.get("voice.rate", "+0%")
     pitch = cfg.get("voice.pitch", "+0Hz")
+    active_engine = engine
     piper_model = ensure_piper_model(cfg) if engine == "piper" else None
 
     out: list[dict] = []
     total = len(scenes)
     for i, scene in enumerate(scenes, 1):
         ts = time.time()
-        print(f"    voice {i}/{total} ({engine}) ...", flush=True)
-        if engine == "piper":
+        print(f"    voice {i}/{total} ({active_engine}) ...", flush=True)
+        if active_engine == "kokoro":
+            path = audio_dir / f"scene_{i:02d}.wav"
+            try:
+                words = _kokoro_scene(scene["narration"], cfg.get("voice.kokoro_voice", "af_heart"), path)
+            except Exception as e:
+                # Kokoro weights/dependencies are loaded only on first use. If
+                # unavailable, switch once to the offline Piper voice for all
+                # remaining scenes instead of failing the whole reel.
+                print(f"      ! Kokoro unavailable ({type(e).__name__}: {e}); switching to Piper")
+                active_engine = "piper"
+                piper_model = ensure_piper_model(cfg)
+                words = _piper_scene(scene["narration"], piper_model, path)
+        elif active_engine == "piper":
             path = audio_dir / f"scene_{i:02d}.wav"
             words = _piper_scene(scene["narration"], piper_model, path)
-        elif engine == "kokoro":
-            path = audio_dir / f"scene_{i:02d}.wav"
-            words = _kokoro_scene(scene["narration"], cfg.get("voice.kokoro_voice", "af_heart"), path)
         else:
             path = audio_dir / f"scene_{i:02d}.mp3"
-            words = asyncio.run(_edge_scene(scene["narration"], voice, rate, pitch, path))
-            if not words:
-                words = _even_words(scene["narration"], duration(path))
-            time.sleep(SCENE_GAP)
+            try:
+                words = asyncio.run(_edge_scene(scene["narration"], voice, rate, pitch, path))
+                if not words:
+                    words = _even_words(scene["narration"], duration(path))
+                time.sleep(SCENE_GAP)
+            except Exception as e:
+                # Edge TTS is an optional online fallback, never a hard dependency.
+                print(f"      ! Edge TTS failed ({type(e).__name__}: {e}); switching to Piper")
+                active_engine = "piper"
+                piper_model = ensure_piper_model(cfg)
+                path = audio_dir / f"scene_{i:02d}.wav"
+                words = _piper_scene(scene["narration"], piper_model, path)
         print(f"      {time.time() - ts:.1f}s  {scene['narration'][:52]}", flush=True)
-        out.append({**scene, "audio_path": str(path), "words": words})
+        out.append({**scene, "audio_path": str(path), "words": words, "voice_engine": active_engine})
     return out
 
 
@@ -171,7 +190,10 @@ def _kokoro_scene(text: str, voice: str, out_path: Path) -> list[dict]:
     import numpy as np
     import soundfile as sf
 
-    pipe = KPipeline(lang_code="a")
+    global _KOKORO_PIPE
+    if _KOKORO_PIPE is None:
+        _KOKORO_PIPE = KPipeline(lang_code="a")
+    pipe = _KOKORO_PIPE
     chunks = []
     for _gs, _ps, audio in pipe(text, voice=voice):
         chunks.append(audio)
