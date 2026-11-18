@@ -190,6 +190,7 @@ def _pexels_candidates(key: str, query: str, orientation: str) -> list[tuple[str
                 files = sorted(
                     (f for f in v.get("video_files", []) if f.get("height", 0) >= 1280),
                     key=lambda f: f.get("height", 0),
+                    reverse=True,
                 )
                 if files:
                     out.append(("video", files[0]["link"]))
@@ -548,26 +549,31 @@ def for_scene(cfg, store, index: int, seconds: float, query: str, out: Path,
 
     if provider == "pexels":
         key = os.environ.get("PEXELS_API_KEY", "").strip()
-        if key:
-            cands = [
-                c for c in _pexels_candidates(key, query, orientation) if c[1] not in used
-            ]
-            if not cands:
-                # Retry without the dedupe filter rather than repeating a scene.
-                cands = _pexels_candidates(key, query, orientation)
-            if cands:
-                # Rotate by scene index: identical queries still yield different clips.
-                kind, url = cands[index % len(cands)]
-                used.add(url)
-                digest = hashlib.sha1(url.encode()).hexdigest()[:16]
-                ext = ".mp4" if kind == "video" else ".jpg"
-                cached = _download(url, _cache_dir() / f"{digest}{ext}")
-                store.bump_visual(digest)
-                if kind == "video":
-                    return from_video(cfg, cached, seconds, out), f"pexels:{digest[:8]}"
-                return from_image(cfg, cached, seconds, out), f"pexels:{digest[:8]}"
-        else:
-            print("    ! PEXELS_API_KEY missing, using procedural")
+        if not key:
+            raise RuntimeError("PEXELS_API_KEY is required; refusing to use procedural placeholders")
+        cands = [
+            c for c in _pexels_candidates(key, query, orientation) if c[1] not in used
+        ]
+        if not cands:
+            # Retry without deduplication before failing the scene.
+            cands = _pexels_candidates(key, query, orientation)
+        if not cands:
+            raise RuntimeError(
+                f"Pexels returned no usable portrait video/photo for scene {index + 1}: {query!r}. "
+                "Check the API key, rate limit, or broaden this scene's visual query."
+            )
+        # Prefer video results and rotate through different clips for repeated queries.
+        kind, url = cands[index % len(cands)]
+        used.add(url)
+        digest = hashlib.sha1(url.encode()).hexdigest()[:16]
+        ext = ".mp4" if kind == "video" else ".jpg"
+        cached = _download(url, _cache_dir() / f"{digest}{ext}")
+        if not cached.exists() or cached.stat().st_size < 10_000:
+            raise RuntimeError(f"Pexels asset download was incomplete: {url}")
+        store.bump_visual(digest)
+        if kind == "video":
+            return from_video(cfg, cached, seconds, out), f"pexels:{digest[:8]}"
+        return from_image(cfg, cached, seconds, out), f"pexels:{digest[:8]}"
 
     if provider == "local":
         files = _local_files()
