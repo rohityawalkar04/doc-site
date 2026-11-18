@@ -174,21 +174,32 @@ def _cache_dir() -> Path:
 
 
 def _openverse_candidates(query: str) -> list[dict]:
-    """Search Openverse anonymously for CC0 images, broadening once if needed.
+    """Search Openverse anonymously for CC0 images with progressively broader terms.
 
-    Do not constrain orientation or size at the API: those filters can exclude
-    otherwise useful CC0 images. from_image() crops landscape/square sources to
-    9:16. CC0 avoids attribution obligations for monetized Shorts.
+    Search relevance is retained by trying the full visual prompt first, then
+    concise keyword combinations, and finally the main subject. No orientation
+    or size filter is applied because valid CC0 sources are cropped to 9:16 by
+    from_image(). CC0 avoids attribution obligations for monetized Shorts.
     """
     words = re.findall(r"[a-zA-Z]{3,}", query.lower())
-    stop = {"the", "and", "with", "from", "into", "over", "under", "three", "four", "two", "one"}
-    broad = " ".join(word for word in words if word not in stop)
-    queries = list(dict.fromkeys(q[:200] for q in (query.strip(), broad) if q.strip()))
+    stop = {
+        "the", "and", "with", "from", "into", "over", "under", "three", "four",
+        "two", "one", "spilled", "open", "dark", "bright", "small", "large",
+        "empty", "broken", "old", "new", "close", "closeup", "close-up",
+    }
+    keywords = [word for word in words if word not in stop]
+    candidates_to_try = [
+        query.strip(),
+        " ".join(keywords),
+        " ".join(keywords[-2:]),
+        keywords[-1] if keywords else "",
+    ]
+    queries = list(dict.fromkeys(q[:200] for q in candidates_to_try if q))
     for search_query in queries:
         try:
             r = requests.get(
                 OPENVERSE_IMAGES,
-                params={"q": search_query, "license": "cc0", "page_size": 20},
+                params={"q": search_query, "license": "cc0", "page_size": 30},
                 headers={"User-Agent": "ReelForge/1.0 (openverse anonymous media search)"},
                 timeout=30,
             )
