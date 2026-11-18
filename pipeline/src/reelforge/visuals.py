@@ -1,10 +1,7 @@
-"""Background visuals: one mp4 per scene, already 1080x1920 @ 30fps.
+"""Background visuals: locally generated AI stills animated into 1080x1920 scene video.
 
-Providers
-  procedural : ffmpeg `gradients` source. Zero keys, zero licensing questions,
-               but identical-looking across videos - a testing default only.
-  openverse  : openly licensed images via anonymous API; CC0 only, no key.
-  local      : files you drop into assets/broll/.
+Gita & Grit uses only MFLUX + Z-Image-Turbo for generated imagery. No stock
+search, image picker, hosted image API, or procedural placeholder is permitted.
 """
 from __future__ import annotations
 
