@@ -66,6 +66,27 @@ class ShortsQualityTests(unittest.TestCase):
         self.assertEqual(first_params["page_size"], 20)
         self.assertEqual(second_params["q"], "desk books")
 
+    def test_openverse_retries_transient_gateway_timeout(self):
+        timeout_response = visuals.requests.Response()
+        timeout_response.status_code = 504
+        timeout_response.url = visuals.OPENVERSE_IMAGES
+        timeout_response._content = b"gateway timeout"
+
+        success_response = visuals.requests.Response()
+        success_response.status_code = 200
+        success_response.url = visuals.OPENVERSE_IMAGES
+        success_response._content = b'{"results":[{"url":"https://images.example/book.jpg","license":"cc0"}]}'
+        found = [{"url": "https://images.example/book.jpg", "license": "cc0"}]
+
+        with patch.object(
+            visuals.requests, "get", side_effect=[timeout_response, success_response]
+        ) as get, patch.object(visuals.time, "sleep") as sleep:
+            result = visuals._openverse_candidates("a desk with three books")
+
+        self.assertEqual(result, found)
+        self.assertEqual(get.call_count, 2)
+        sleep.assert_called_once_with(1)
+
     def test_openverse_http_errors_include_response_details(self):
         response = visuals.requests.Response()
         response.status_code = 401
