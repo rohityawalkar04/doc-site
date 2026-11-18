@@ -65,17 +65,15 @@ def cmd_doctor(args) -> int:
     provider = cfg.get("visuals.provider", "procedural")
     key = os.environ.get("PEXELS_API_KEY", "").strip()
     if provider in ("ai_cartoon", "ai"):
-        backend = cfg.get("visuals.ai_backend", "local_sd")
-        line("ai backend", True, backend)
-        if backend == "local_sd":
+        backend = cfg.get("visuals.ai_backend", "mflux_z_image")
+        line("ai backend", backend == "mflux_z_image", backend)
+        if backend == "mflux_z_image":
             try:
-                import torch
-                from diffusers import AutoPipelineForText2Image  # noqa: F401
-                line("local diffusion", True,
-                     f"torch {torch.__version__}, mps={torch.backends.mps.is_available()}, "
-                     f"{cfg.get('visuals.local_model')}")
+                from mflux.models.z_image import ZImageTurbo  # noqa: F401
+                supported = sys.platform == "darwin" and __import__("platform").machine() == "arm64"
+                line("MFLUX runtime", supported, "Apple Silicon MLX" if supported else "requires Apple Silicon macOS")
             except ImportError:
-                line("local diffusion", False, "pip install -r requirements-ai.txt")
+                line("MFLUX runtime", False, "pip install -r requirements-ai.txt")
         line("animate", bool(cfg.get("visuals.animate", True)),
              "zoom/pan per scene")
     elif provider == "pexels":
