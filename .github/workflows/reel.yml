@@ -1,23 +1,117 @@
-name: reel-local-only
-
-# Image generation now runs on the owner's Apple Silicon Mac using MLX.
-# GitHub-hosted Linux runners cannot use that local GPU, so this workflow is
-# intentionally manual and informational; it must not publish or call image APIs.
+name: Gita & Grit — build and publish
 
 on:
   workflow_dispatch:
+  schedule:
+    # 09:00 India time (UTC+05:30).
+    - cron: "30 3 * * *"
 
 permissions:
   contents: read
 
+concurrency:
+  group: gita-grit-reel-pipeline
+  cancel-in-progress: false
+
 jobs:
-  local-only:
-    runs-on: ubuntu-latest
+  build-and-publish:
+    runs-on: [self-hosted, macOS, ARM64, gita-grit-m4]
+    timeout-minutes: 240
     steps:
-      - name: Explain local generation requirement
+      - name: Checkout without deleting persistent model/cache/state files
+        uses: actions/checkout@v4
+        with:
+          clean: false
+
+      - name: Verify Apple Silicon runner and tools
+        shell: bash
         run: |
-          echo "::notice title=Local generation required::Run the Gita & Grit reel pipeline on your M4 Mac."
-          echo "This workflow intentionally does not generate images or publish videos."
-          echo "On the Mac: cd pipeline && ./scripts/setup.sh"
-          echo "Then: source .venv/bin/activate && pip install -r requirements-ai.txt"
-          echo "Then: reelforge doctor && reelforge render --count 1"
+          set -euo pipefail
+          test "$(uname -s)" = "Darwin"
+          test "$(uname -m)" = "arm64"
+          command -v brew
+          command -v ffmpeg
+          command -v ffprobe
+          command -v ollama
+          python3 --version
+          if ! curl --fail --silent http://127.0.0.1:11434/api/tags >/dev/null; then
+            nohup ollama serve > "$HOME/Library/Logs/gita-grit-ollama.log" 2>&1 &
+            for attempt in {1..30}; do
+              if curl --fail --silent http://127.0.0.1:11434/api/tags >/dev/null; then break; fi
+              sleep 2
+            done
+          fi
+          curl --fail --silent http://127.0.0.1:11434/api/tags >/dev/null
+
+      - name: Install pipeline dependencies and ensure local script models
+        working-directory: pipeline
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./scripts/setup.sh
+          source .venv/bin/activate
+          python -m pip install -r requirements-ai.txt
+          ollama pull qwen2.5:7b-instruct
+          ollama pull gemma3:4b
+
+      - name: Check local YouTube credentials without printing them
+        working-directory: pipeline
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s secrets/yt_client_secret.json
+          test -s secrets/yt_token.json
+          chmod 700 secrets
+          chmod 600 secrets/yt_client_secret.json secrets/yt_token.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for name in ("yt_client_secret.json", "yt_token.json"):
+              with (Path("secrets") / name).open() as f:
+                  data = json.load(f)
+              if not isinstance(data, dict) or not data:
+                  raise SystemExit(f"Invalid YouTube credential file: {name}")
+          print("YouTube credential files are present and valid JSON; contents not displayed.")
+          PY
+
+      - name: Build one reel (local Ollama + MFLUX + FFmpeg)
+        working-directory: pipeline
+        shell: bash
+        env:
+          OLLAMA_HOST: http://127.0.0.1:11434
+        run: |
+          set -euo pipefail
+          source .venv/bin/activate
+          reelforge render --count 1 --stop-on-error
+
+      - name: Validate newest reel before upload
+        working-directory: pipeline
+        shell: bash
+        run: |
+          set -euo pipefail
+          source .venv/bin/activate
+          reel_id="$(reelforge list --limit 1 | awk 'NF >= 3 && $1 !~ /^reel_id$/ {print $1; exit}')"
+          test -n "$reel_id"
+          reelforge verify "$reel_id"
+          echo "REEL_ID=$reel_id" >> "$GITHUB_ENV"
+
+      - name: Publish validated reel to YouTube Shorts
+        working-directory: pipeline
+        shell: bash
+        env:
+          OLLAMA_HOST: http://127.0.0.1:11434
+        run: |
+          set -euo pipefail
+          source .venv/bin/activate
+          reelforge publish "$REEL_ID" --platforms youtube --yes
+
+      - name: Upload MP4 and JSON as workflow artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gita-grit-reel
+          path: |
+            pipeline/out/*.mp4
+            pipeline/out/*.json
+          if-no-files-found: warn
+          retention-days: 14
