@@ -55,32 +55,44 @@ Return ONLY this JSON shape:
 
 
 def _ollama_chat(cfg, prompt: str) -> dict:
+    """Try configured local models in order; continue when a model is missing or fails."""
     host = (os.environ.get("OLLAMA_HOST") or "http://127.0.0.1:11434").rstrip("/")
-    model = cfg.get("llm.model", "llama3.2:latest")
-    body = json.dumps(
-        {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": SYSTEM},
-                {"role": "user", "content": prompt},
-            ],
-            "stream": False,
-            "format": "json",
-            "options": {
-                "temperature": float(cfg.get("llm.temperature", 0.8)),
-                # Ollama caps num_predict by default; a 12-scene script is ~700
-                # tokens and gets silently truncated mid-array without this.
-                "num_predict": 1200,
-                "num_ctx": 4096,
-            },
-        }
-    ).encode()
-    req = urllib.request.Request(
-        host + "/api/chat", data=body, headers={"Content-Type": "application/json"}
-    )
-    with urllib.request.urlopen(req, timeout=int(cfg.get("llm.timeout", 240))) as r:
-        payload = json.load(r)
-    return json.loads(payload["message"]["content"])
+    models = cfg.get("llm.models") or [cfg.get("llm.model", "qwen2.5:7b-instruct")]
+    if isinstance(models, str):
+        models = [models]
+    last_error: Exception | None = None
+    for model in models:
+        body = json.dumps(
+            {
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": SYSTEM},
+                    {"role": "user", "content": prompt},
+                ],
+                "stream": False,
+                "format": "json",
+                "options": {
+                    "temperature": float(cfg.get("llm.temperature", 0.8)),
+                    "num_predict": 1200,
+                    "num_ctx": 4096,
+                },
+            }
+        ).encode()
+        req = urllib.request.Request(
+            host + "/api/chat", data=body, headers={"Content-Type": "application/json"}
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=int(cfg.get("llm.timeout", 240))) as r:
+                payload = json.load(r)
+            result = json.loads(payload["message"]["content"])
+            result["_llm_model"] = model
+            return result
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError, KeyError) as e:
+            last_error = e
+            print(f"    ! Ollama model {model} unavailable/failed: {type(e).__name__}: {e}")
+    if last_error:
+        raise last_error
+    raise RuntimeError("No local LLM models configured")
 
 
 BANNED = [
@@ -323,6 +335,7 @@ def generate(cfg, topic: dict) -> tuple[dict, str]:
             reason = f"{type(e).__name__}: {e}"
             break
         script = _normalise(raw, topic, cfg)
+        script["_llm_model"] = raw.get("_llm_model")
         safety, advisory = _problems(script, cfg)
         s = score(script)
         if best_score is None or s < best_score:
