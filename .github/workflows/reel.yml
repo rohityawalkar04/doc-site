@@ -144,38 +144,24 @@ jobs:
         run: |
           PYTHONPATH=src python -u scripts/cloud_run.py \
             --count "${{ github.event.inputs.count || '0' }}" \
+            --record \
             ${{ github.event.inputs.mode == 'dry-run' && '--dry-run' || '' }}
 
-      # Runs even on failure: a reel published before the error must still be
-      # recorded, or the next run would build it again.
+      # Safety net: cloud_run.py records after every reel (--record) and stops the
+      # batch when a push loses. This step runs even on failure, so a reel uploaded
+      # before an error still lands in the ledger, and a lost push still turns the
+      # run red instead of leaving a green run that forgot what it did.
       - name: Record what was published
         if: always()
         run: |
-          git config user.name  "reelforge-bot"
-          git config user.email "reelforge-bot@users.noreply.github.com"
-          git add state/ 2>/dev/null || true
-          if git diff --cached --quiet; then
-            echo "ledger unchanged"
-            exit 0
-          fi
-          git commit -m "chore: record published reel [skip ci]"
-
-          # actions/checkout leaves a DETACHED HEAD for schedule and
-          # workflow_dispatch runs, where a bare `git push` fails with
-          # "push the history leading to the current (detached HEAD)". That is
-          # exactly how a reel got uploaded twice on 16 Nov: the upload worked,
-          # the ledger never landed, and the next run did not know.
-          # Always push an explicit refspec.
-          for attempt in 1 2 3; do
-            git pull --rebase --autostash origin main >/dev/null 2>&1 || true
-            if git push origin HEAD:main; then
-              echo "ledger pushed (attempt $attempt)"
-              exit 0
-            fi
-            sleep 5
-          done
-          echo "::error title=Ledger NOT recorded::push failed after 3 attempts. Add the topic_id to state/published.json by hand."
-          exit 1
+          # One implementation, in the script the loop itself calls: a second copy
+          # of this git dance is how the two paths drift apart again.
+          # `|| { ... }` rather than a `$?` check because Actions runs this under -e,
+          # which would exit before the annotation below could print.
+          ./scripts/record_ledger.sh || {
+            echo "::error title=Ledger NOT recorded::push failed after 3 attempts. Add the topic_id to state/published.json by hand before the next run."
+            exit 1
+          }
 
       - name: Upload the renders for inspection
         if: always()

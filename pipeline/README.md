@@ -302,8 +302,25 @@ card, no machine at home.
 
    `count` defaults to `0` = keep going until something fails. Set `count: 1` to
    publish a single episode. The topic that failed stays out of the ledger, so
-   the next run retries it — no duplicates, no lost work.
-4. Runs daily at `37 13 * * *` = **19:07 IST**, inside the evening posting
+   the next run retries it.
+4. **The ledger is written after every reel, not once per run.** `cloud_run.py
+   --record` commits and pushes `state/published.json` immediately after each
+   upload, and **stops the batch** if that push fails. The 16-17 Nov runs pushed
+   once at the end; the push failed on a detached `actions/checkout` HEAD, so the
+   ledger never landed and the next night re-uploaded the same three topics. One
+   lost push now costs at most one duplicate, and the run turns red instead of
+   finishing green with an untrue ledger. Publishing also asks the ledger before
+   uploading (bypass on purpose with `reelforge publish <reel> --force`), so a
+   fresh checkout cannot re-upload something another machine already published.
+5. **The channel itself is the last word.** Before a YouTube upload,
+   `publish.youtube.channel_id` is used to read
+   `youtube.com/feeds/videos.xml` and compare titles. Zero quota, no OAuth scope,
+   no auth. This is the only check that survives a ledger which is wrong for a
+   reason outside this code - a manual upload in Studio, or a push that lost
+   after the video went live. The feed covers the last 15 uploads; the ledger
+   covers everything older. If the feed cannot be read, the upload proceeds on
+   the ledger alone and says so, because a feed outage must not stop the channel.
+6. Runs daily at `37 13 * * *` = **19:07 IST**, inside the evening posting
    window. `:37` because GitHub's scheduler is worst at the top of the hour and
    can drop runs entirely under load.
 

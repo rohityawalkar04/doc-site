@@ -256,7 +256,8 @@ def cmd_publish(args) -> int:
     cfg = _boot()
     store = state.Store(cfg.db)
     platforms = [p.strip() for p in args.platforms.split(",") if p.strip()]
-    publish_mod.publish(cfg, store, args.reel_id, platforms, dry_run=not args.yes)
+    publish_mod.publish(cfg, store, args.reel_id, platforms, dry_run=not args.yes,
+                        ignore_ledger=args.force)
     if not args.yes:
         print("\n  dry run - nothing was uploaded. add --yes to publish.")
     return 0
@@ -316,6 +317,9 @@ def main(argv: list[str] | None = None) -> int:
     pb.add_argument("reel_id")
     pb.add_argument("--platforms", default="youtube,instagram,facebook")
     pb.add_argument("--yes", action="store_true", help="actually upload")
+    pb.add_argument("--force", action="store_true",
+                    help="upload even though the ledger or the channel already has this "
+                         "title (a deliberate re-upload, not a retry)")
     pb.set_defaults(fn=cmd_publish)
 
     rn = sub.add_parser("run", help="render and optionally publish (cron entry point)")

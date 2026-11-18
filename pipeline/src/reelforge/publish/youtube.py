@@ -13,12 +13,58 @@ Two traps worth knowing:
 from __future__ import annotations
 
 import os
+import re
 import sys
+import urllib.error
+import urllib.request
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 API = "youtube"
 VERSION = "v3"
+FEED = "https://www.youtube.com/feeds/videos.xml?channel_id={cid}"
+ATOM = "{http://www.w3.org/2005/Atom}"
+
+
+def title_key(text: str) -> str:
+    """Comparable form of a title: case, accents-as-typed, spacing and punctuation
+    are not what tells two uploads apart - the words are."""
+    return re.sub(r"[^a-z0-9]+", " ", (text or "").casefold()).strip()
+
+
+def recent_titles(cfg, timeout: float = 15.0) -> list[str] | None:
+    """Titles of the channel's most recent uploads, from the public RSS feed.
+
+    Zero quota, no OAuth scope, no auth at all: this is the one view of the
+    channel that cannot be stale-and-local. The Data API's own list call would
+    need `youtube.readonly` added to SCOPES, which invalidates every cached token.
+
+    Returns None when the feed cannot be read. The caller decides what that
+    means; here it means "fall back to the ledger", because a feed outage must
+    not silently stop the channel.
+
+    The feed carries the last 15 uploads, so this catches the case that actually
+    happens - a run re-walking the head of its own queue. Older reels are the
+    ledger's job.
+    """
+    cid = str(cfg.get("publish.youtube.channel_id", "") or "").strip()
+    if not cid:
+        return None
+    url = FEED.format(cid=cid)
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as r:
+            body = r.read()
+        root = ET.fromstring(body)
+    except (urllib.error.URLError, OSError, ValueError, ET.ParseError):
+        return None
+    titles = []
+    for entry in root.findall(f"{ATOM}entry"):
+        t = entry.findtext(f"{ATOM}title")
+        if t:
+            titles.append(t.strip())
+    return titles
+
 
 
 def _service(cfg):

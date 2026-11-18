@@ -7,7 +7,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import captions, captions_png, config, llm, render, state, visuals, voice
+from . import captions, captions_png, config, ledger, llm, render, state, visuals, voice
 
 
 def log(msg: str) -> None:
@@ -30,8 +30,12 @@ def next_topic(cfg, store: state.Store) -> dict:
     if not topics:
         raise SystemExit("config/topics.yaml has no topics")
     for t in topics:
-        if not store.topic_used(str(t["id"])):
-            return t
+        # topics_used is this machine's history; the ledger is everyone's. A fresh
+        # clone has an empty sqlite but a truthful ledger, so skipping on both is
+        # what stops a local run rebuilding something that is already live.
+        if store.topic_used(str(t["id"])) or ledger.is_published(str(t["id"])):
+            continue
+        return t
     raise SystemExit("all topics in config/topics.yaml are used - add more")
 
 

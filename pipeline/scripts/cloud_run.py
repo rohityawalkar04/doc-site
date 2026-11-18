@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -98,6 +99,23 @@ def preflight(cfg) -> list[str]:
     return problems
 
 
+def record_now() -> bool:
+    """Commit and push the ledger. Called after every upload when --record is set.
+
+    Separate process on purpose: git state (detached HEAD, rebase conflicts, a
+    protected branch) is the shell's problem, and the script's exit code is the
+    one fact this loop needs.
+    """
+    script = ROOT / "scripts" / "record_ledger.sh"
+    print("  recording the ledger", flush=True)
+    try:
+        r = subprocess.run([str(script)], cwd=str(ROOT))
+    except OSError as e:
+        print(f"  ! could not run {script}: {e}", flush=True)
+        return False
+    return r.returncode == 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--count", type=int, default=1)
@@ -107,6 +125,10 @@ def main() -> int:
     ap.add_argument("--once-per-day", action="store_true",
                     help="exit if a reel was already published today (UTC); makes "
                          "redundant scheduled triggers safe")
+    ap.add_argument("--record", action="store_true",
+                    help="commit and push the ledger after every upload, and stop the "
+                         "batch if that push fails (CI: one lost push = one duplicate, "
+                         "not a night's worth)")
     args = ap.parse_args()
 
     if args.dry_run:
@@ -210,6 +232,21 @@ def main() -> int:
             left = len(topics) - topics.index(topic)
             print(f"\nSTOPPED after {len(ledger.load())} published. {left} reel(s) still queued.")
             return 1
+
+        # Record this reel before building the next one. The 16-17 Nov jobs uploaded
+        # six reels and pushed the ledger once, at the end; that push failed on a
+        # detached HEAD and the next run re-uploaded the first three. Recording per
+        # reel caps one lost push at one duplicate, and stopping here - rather than
+        # carrying on unrecorded - is what keeps the ledger from drifting further.
+        if args.record and not result.get("skipped"):
+            if not record_now():
+                left = len(topics) - topics.index(topic)
+                print("::error title=Ledger NOT recorded::the upload succeeded but the "
+                      "ledger did not land; stopping so the next run does not re-upload "
+                      "this reel or anything after it")
+                print(f"\nSTOPPED (unrecorded) after {len(ledger.load())} recorded. "
+                      f"{left} reel(s) still queued.")
+                return 1
 
     print(f"\nledger now holds {len(ledger.load())} published topic(s)")
     return 0

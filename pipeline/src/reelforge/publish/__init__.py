@@ -1,9 +1,14 @@
 """Publisher dispatch.
 
-Two properties matter for an unattended daily job:
+Three properties matter for an unattended daily job:
 
   * Idempotent - a platform already recorded for a reel is skipped, so a retry
-    after a partial failure never double-posts.
+    after a partial failure never double-posts. The committed ledger is consulted
+    too, not just this machine's sqlite: a fresh checkout has no history of its
+    own, and that is how the 16-17 Nov jobs re-uploaded three reels.
+  * Verified - before a YouTube upload, the channel's own feed is asked whether a
+    video with this title is already live. A ledger is only as true as its last
+    successful push; the channel is always true.
   * Isolated - one platform failing (expired token, quota, no business account)
     must not stop the other two. Failures are collected and reported at the end.
 """
@@ -21,7 +26,7 @@ PLATFORMS = ("youtube", "instagram", "facebook")
 
 
 def publish(cfg, store: state.Store, reel_id: str, platforms: list[str],
-            dry_run: bool = True) -> dict:
+            dry_run: bool = True, ignore_ledger: bool = False) -> dict:
     reel = store.get_reel(reel_id)
     if not reel:
         raise SystemExit(f"unknown reel {reel_id!r} - run `reelforge list`")
@@ -32,6 +37,17 @@ def publish(cfg, store: state.Store, reel_id: str, platforms: list[str],
     video = Path(reel["video_path"] or "")
     if not video.exists():
         raise SystemExit(f"video missing on disk: {video}")
+
+    # The committed ledger is the only record that survives a wiped filesystem; sqlite
+    # is not. Until this check existed, `store.pub()` was the whole guard, so a run on
+    # a fresh checkout uploaded whatever the ledger already knew about - which is how
+    # the 16-17 Nov jobs uploaded the same three topics twice. Ask the ledger, here,
+    # once, on behalf of every caller.
+    topic_id = reel.get("topic_id")
+    if not ignore_ledger and topic_id and ledger.is_published(topic_id):
+        print(f"  = ledger: {topic_id} is already published -> skipping {reel_id}")
+        print("     (rebuild-and-reupload on purpose: pass --force)")
+        return {"skipped": True, "ledger": True, "topic_id": topic_id}
 
     results: dict[str, dict] = {}
     failures: dict[str, str] = {}
@@ -52,6 +68,22 @@ def publish(cfg, store: state.Store, reel_id: str, platforms: list[str],
             continue
 
         print(f"  -> {platform}")
+
+        # The ledger only knows what this project recorded. The channel knows what is
+        # actually live - including anything uploaded by hand or from a machine whose
+        # ledger push lost. Ask it before spending 1,600 quota units, and before
+        # putting the same video on the channel a second time.
+        if platform == "youtube" and not ignore_ledger:
+            live = youtube.recent_titles(cfg)
+            if live is None:
+                print("     ! channel feed unreadable - relying on the ledger alone")
+            elif youtube.title_key(meta_mod.youtube_meta(meta)["title"]) in {
+                    youtube.title_key(t) for t in live}:
+                print("     = youtube: a video with this title is already on the channel"
+                      " -> skipping")
+                results[platform] = {"skipped": True, "live_title": True}
+                continue
+
         if dry_run:
             print(f"     would upload {video.name} ({video.stat().st_size/1e6:.1f} MB)")
             results[platform] = {"dry_run": True}

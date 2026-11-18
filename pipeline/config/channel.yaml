@@ -142,6 +142,11 @@ paths:
 publish:
   youtube:
     enabled: true
+    # The channel's public id, used for one thing: reading
+    # youtube.com/feeds/videos.xml before an upload, so a title that is already
+    # live is never uploaded twice. Zero quota, no OAuth scope, no auth.
+    # Resolve it with: curl -s "https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=<any video id>&format=json"
+    channel_id: UCW0EU8l9z5-hrdyjw4IQPcw   # @gitaandgrit
     privacy: public          # public | unlisted | private
     category_id: "27"        # 27 = Education, 28 = Science & Tech
     made_for_kids: false
