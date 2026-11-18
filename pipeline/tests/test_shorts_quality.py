@@ -63,7 +63,18 @@ class ShortsQualityTests(unittest.TestCase):
         self.assertNotIn("aspect_ratio", first_params)
         self.assertNotIn("size", first_params)
         self.assertEqual(first_params["q"], "a desk with three open books")
-        self.assertEqual(second_params["q"], "desk open books")
+        self.assertEqual(first_params["page_size"], 20)
+        self.assertEqual(second_params["q"], "desk books")
+
+    def test_openverse_http_errors_include_response_details(self):
+        response = visuals.requests.Response()
+        response.status_code = 401
+        response.url = visuals.OPENVERSE_IMAGES
+        response.headers["x-request-id"] = "test-request-id"
+        response._content = b'{"detail":"invalid or missing credentials"}'
+        with patch.object(visuals.requests, "get", return_value=response):
+            with self.assertRaisesRegex(RuntimeError, "401.*invalid or missing credentials"):
+                visuals._openverse_candidates("a cup of tea")
 
     def test_openverse_falls_back_to_main_subject(self):
         class Response:
