@@ -23,7 +23,6 @@ sys.path.insert(0, str(ROOT / "src"))
 os.environ.setdefault("REELFORGE_ROOT", str(ROOT))
 
 from reelforge import config, ledger, pipeline, state  # noqa: E402
-from reelforge.visuals import AiQuotaExhausted  # noqa: E402
 
 # CI captures stdout, so Python block-buffers it and progress appears in
 # 8KB lumps - which looks exactly like a hang.
