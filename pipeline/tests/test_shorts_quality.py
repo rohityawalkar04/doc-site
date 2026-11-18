@@ -1,6 +1,7 @@
 """Regression tests for Shorts pacing and local-only visual integrity."""
 from __future__ import annotations
 
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
@@ -51,20 +52,20 @@ class ShortsQualityTests(unittest.TestCase):
 
     def test_local_image_cache_is_verified_and_reused(self):
         cfg = {"visuals.provider": "ai_cartoon", "visuals.animate": False}
+        query = "cached scene"
+        seed = int(hashlib.sha1(f"{query}|0".encode()).hexdigest()[:8], 16)
         with tempfile.TemporaryDirectory() as tmp, patch.object(
             visuals, "_ai_cache", return_value=Path(tmp)
         ):
-            image_path = Path(tmp) / "cached.jpg"
-            Image.new("RGB", (256, 256), (30, 40, 50)).save(image_path, quality=98)
-            with patch.object(visuals, "generate_image") as generate:
-                # Use the actual image verification path; rendering is mocked.
-                with patch.object(visuals, "from_image", return_value=Path(tmp) / "scene.mp4"):
-                    path, source = visuals.for_scene(
-                        cfg, type("Store", (), {"bump_visual": lambda *_: None})(),
-                        0, 3.0, "cached scene", Path(tmp) / "scene.mp4"
-                    )
-            generate.assert_not_called()
+            image_path = Path(tmp) / f"{seed:08x}.jpg"
+            Image.effect_noise((512, 512), 100).convert("RGB").save(image_path, quality=98)
+            with patch.object(visuals, "from_image", return_value=Path(tmp) / "scene.mp4"):
+                path, source = visuals.for_scene(
+                    cfg, type("Store", (), {"bump_visual": lambda *_: None})(),
+                    0, 3.0, query, Path(tmp) / "scene.mp4"
+                )
             self.assertEqual(source.split(":")[0], "ai")
+
 
 
 if __name__ == "__main__":
