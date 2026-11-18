@@ -82,12 +82,24 @@ jobs:
       # 13 images per reel is the expensive part (~600 neurons) and a rebuild of
       # the same script produces identical seeds, so a warm cache makes retries
       # free. The free allocation is 10,000 neurons/day.
-      - name: Cache generated illustrations
-        uses: actions/cache@v4
+      # Illustrations are named by a hash of (visual_query, scene index), so a
+      # scene that has been rendered once costs nothing to rebuild. The key used
+      # to be the hash of config/topics.yaml alone - constant for weeks - and
+      # actions/cache skips saving on an exact key hit. So newly generated scenes
+      # were never stored: every run after the first re-rendered all 13 images
+      # (~580 neurons), and three consecutive runs on 17-18 Nov died on the
+      # 10,000-neuron daily budget while building the same reel.
+      #
+      # A per-run key with an `ai-` restore prefix gives the append-only behaviour
+      # the cache was always meant to have: restore the newest snapshot, always
+      # write a new one.
+      - name: Restore generated illustrations
+        uses: actions/cache/restore@v4
         with:
           path: pipeline/assets/cache/ai
-          key: ai-${{ hashFiles('pipeline/config/topics.yaml') }}
+          key: ai-${{ hashFiles('pipeline/config/topics.yaml') }}-${{ github.run_id }}
           restore-keys: |
+            ai-${{ hashFiles('pipeline/config/topics.yaml') }}-
             ai-
 
       - name: Check required secrets are present
@@ -146,6 +158,16 @@ jobs:
             --count "${{ github.event.inputs.count || '0' }}" \
             --record \
             ${{ github.event.inputs.mode == 'dry-run' && '--dry-run' || '' }}
+
+      # Saved even when the build fails: a run that died at scene 6 of 13 has six
+      # images worth keeping, and the retry must not pay for them again. The guard
+      # keeps the step quiet on runs that produced nothing.
+      - name: Save generated illustrations
+        if: always() && hashFiles('pipeline/assets/cache/ai/**') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: pipeline/assets/cache/ai
+          key: ai-${{ hashFiles('pipeline/config/topics.yaml') }}-${{ github.run_id }}
 
       # Safety net: cloud_run.py records after every reel (--record) and stops the
       # batch when a push loses. This step runs even on failure, so a reel uploaded

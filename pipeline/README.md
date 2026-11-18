@@ -339,8 +339,14 @@ card, no machine at home.
   Write them in batches; that part is still yours.
 - **No sqlite** — the runner is wiped each time, so "what has been published"
   lives in `state/published.json`, committed back by the workflow.
-- **No image cache** — 13 images are regenerated per reel, ~580 Neurons, about 6%
-  of the daily allowance.
+- **Image cache, keyed per run** — scene images are named by a hash of
+  (visual_query, scene index), so a scene that was rendered once is free to
+  rebuild. The workflow restores the newest `ai-` snapshot and always writes a
+  new one, including on a failed run, so a retry resumes instead of paying
+  ~580 Neurons again. (The key used to be the topics.yaml hash alone, constant
+  for weeks: actions/cache skips the save on an exact hit, so new scenes were
+  generated and never stored. That is what exhausted the daily budget on
+  17-18 Nov.)
 
 ### The catch that matters
 
