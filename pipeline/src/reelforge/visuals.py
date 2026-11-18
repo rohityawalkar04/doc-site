@@ -199,7 +199,7 @@ def _openverse_candidates(query: str) -> list[dict]:
         try:
             r = requests.get(
                 OPENVERSE_IMAGES,
-                params={"q": search_query, "license": "cc0", "page_size": 30},
+                params={"q": search_query, "license": "cc0", "page_size": 20},
                 headers={"User-Agent": "ReelForge/1.0 (openverse anonymous media search)"},
                 timeout=30,
             )
@@ -213,6 +213,18 @@ def _openverse_candidates(query: str) -> list[dict]:
             ]
             if candidates:
                 return candidates
+        except requests.HTTPError as exc:
+            response = exc.response
+            status = response.status_code if response is not None else "unknown"
+            detail = (response.text or "")[:500] if response is not None else ""
+            request_id = ""
+            if response is not None:
+                request_id = response.headers.get("x-request-id") or response.headers.get("cf-ray") or ""
+            suffix = f"; request_id={request_id}" if request_id else ""
+            raise RuntimeError(
+                f"Openverse image search failed ({status}): {exc}; "
+                f"response={detail!r}{suffix}"
+            ) from exc
         except requests.RequestException as exc:
             raise RuntimeError(f"Openverse image search failed: {exc}") from exc
     return []
