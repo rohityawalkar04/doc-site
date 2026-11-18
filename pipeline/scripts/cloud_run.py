@@ -1,14 +1,8 @@
-"""Cloud entry point: build one reel and publish it, on a machine with no GPU.
+"""Legacy entry point retained for local macOS runs.
 
-Designed for GitHub Actions, where:
-  * visuals are generated with the local open-weight diffusion model on CPU
-  * there is no local LLM               -> scripts come from the beats in topics.yaml
-  * the filesystem is wiped each run    -> "what has been published" lives in a
-                                          committed JSON ledger, not in sqlite
+This script exits immediately on non-macOS hosts because the configured image
+backend requires Apple MLX on the owner's Apple Silicon Mac.
 
-Usage (locally too, if you set the env vars):
-    PYTHONPATH=src python scripts/cloud_run.py [--count 1] [--dry-run]
-"""
 from __future__ import annotations
 
 import argparse
