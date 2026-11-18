@@ -79,24 +79,22 @@ jobs:
           path: pipeline/assets/piper
           key: piper-en_US-ryan-high-v1
 
-      # Cache Pexels stock assets so a rerun does not download the same clips.
-      - name: Cache licensed stock visuals
+      # Cache CC0 Openverse images so reruns avoid repeat searches/downloads.
+      - name: Cache openly licensed visuals
         uses: actions/cache@v4
         with:
-          path: pipeline/assets/cache/pexels
-          key: pexels-${{ hashFiles('pipeline/config/topics.yaml') }}
+          path: pipeline/assets/cache/openverse
+          key: openverse-${{ hashFiles('pipeline/config/topics.yaml') }}
           restore-keys: |
-            pexels-
+            openverse-
 
       - name: Check required secrets are present
         env:
-          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           YT_CLIENT_SECRET_JSON: ${{ secrets.YT_CLIENT_SECRET_JSON }}
           YT_TOKEN_JSON: ${{ secrets.YT_TOKEN_JSON }}
           RUN_MODE: ${{ github.event_name == 'schedule' && 'dry-run' || github.event.inputs.mode || 'dry-run' }}
         run: |
           missing=""
-          if [ -z "$PEXELS_API_KEY" ]; then missing="$missing PEXELS_API_KEY"; fi
           if [ "$RUN_MODE" = "publish" ]; then
             if [ -z "$YT_CLIENT_SECRET_JSON" ]; then missing="$missing YT_CLIENT_SECRET_JSON"; fi
             if [ -z "$YT_TOKEN_JSON" ]; then missing="$missing YT_TOKEN_JSON"; fi
@@ -116,7 +114,6 @@ jobs:
           IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
           FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
           FB_PAGE_TOKEN: ${{ secrets.FB_PAGE_TOKEN }}
-          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
         run: |
           mkdir -p secrets
           printf '%s' "$YT_CLIENT_SECRET_JSON" > secrets/yt_client_secret.json
@@ -127,7 +124,6 @@ jobs:
             echo "IG_ACCESS_TOKEN=$IG_ACCESS_TOKEN"
             echo "FB_PAGE_ID=$FB_PAGE_ID"
             echo "FB_PAGE_TOKEN=$FB_PAGE_TOKEN"
-            echo "PEXELS_API_KEY=$PEXELS_API_KEY"
             echo "IG_HOST=gh_release"
             echo "GH_RELEASE_REPO=${{ github.repository }}"
           } > .env

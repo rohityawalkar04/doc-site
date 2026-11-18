@@ -1,7 +1,7 @@
 """Cloud entry point: build one reel and publish it, on a machine with no GPU.
 
 Designed for GitHub Actions, where:
-  * there is no GPU and no model cache  -> visuals come from Pexels' free stock library
+  * there is no GPU and no model cache  -> visuals come from Openverse's anonymous CC0 image library
   * there is no local LLM               -> scripts come from the beats in topics.yaml
   * the filesystem is wiped each run    -> "what has been published" lives in a
                                           committed JSON ledger, not in sqlite
@@ -116,14 +116,11 @@ def main() -> int:
 
     cfg = config.load()
     cfg.override("script.mode", "beats")          # no LLM in CI
-    cfg.override("visuals.provider", "pexels")
+    cfg.override("visuals.provider", "openverse")
 
-    # Stock visuals are required for every scene. Fail before rendering rather
-    # than silently producing gradient placeholders.
-    if not os.environ.get("PEXELS_API_KEY", "").strip():
-        print("::error title=Visual backend::PEXELS_API_KEY is required for free stock visuals")
-        return 1
-    print("preflight: Pexels stock visuals configured")
+    # Openverse supports anonymous image search. No API key or paid inference
+    # account is required; CC0-only results keep monetized-use licensing simple.
+    print("preflight: Openverse anonymous CC0 visuals configured")
 
     # A build-only run publishes nothing, so it must not require publish
     # credentials. Demanding the YouTube token here is what failed the first
