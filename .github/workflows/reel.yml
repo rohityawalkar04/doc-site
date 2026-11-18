@@ -54,13 +54,20 @@ jobs:
           ollama pull qwen2.5:7b-instruct
           ollama pull gemma3:4b
 
-      - name: Check local YouTube credentials without printing them
+      - name: Materialize encrypted YouTube credentials
         working-directory: pipeline
         shell: bash
+        env:
+          YT_CLIENT_SECRET_JSON_B64: ${{ secrets.YT_CLIENT_SECRET_JSON_B64 }}
+          YT_TOKEN_JSON_B64: ${{ secrets.YT_TOKEN_JSON_B64 }}
         run: |
           set -euo pipefail
-          test -s secrets/yt_client_secret.json
-          test -s secrets/yt_token.json
+          test -n "$YT_CLIENT_SECRET_JSON_B64"
+          test -n "$YT_TOKEN_JSON_B64"
+          umask 077
+          mkdir -p secrets
+          printf '%s' "$YT_CLIENT_SECRET_JSON_B64" | base64 --decode > secrets/yt_client_secret.json
+          printf '%s' "$YT_TOKEN_JSON_B64" | base64 --decode > secrets/yt_token.json
           chmod 700 secrets
           chmod 600 secrets/yt_client_secret.json secrets/yt_token.json
           python - <<'PY'
@@ -71,7 +78,7 @@ jobs:
                   data = json.load(f)
               if not isinstance(data, dict) or not data:
                   raise SystemExit(f"Invalid YouTube credential file: {name}")
-          print("YouTube credential files are present and valid JSON; contents not displayed.")
+          print("Encrypted YouTube credentials decoded and validated; contents not displayed.")
           PY
 
       - name: Build one reel (local Ollama + MFLUX + FFmpeg)
@@ -104,6 +111,13 @@ jobs:
           set -euo pipefail
           source .venv/bin/activate
           reelforge publish "$REEL_ID" --platforms youtube --yes
+
+      - name: Remove credential files from the runner workspace
+        if: always()
+        working-directory: pipeline
+        shell: bash
+        run: |
+          rm -f secrets/yt_client_secret.json secrets/yt_token.json
 
       - name: Upload MP4 and JSON as workflow artifacts
         if: always()
