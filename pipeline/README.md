@@ -40,7 +40,7 @@ open out/*.mp4
 |---|---|---|---|
 | Script | Ollama Qwen2.5 7B | Ollama Gemma 3 4B → topic beat sheet | Local |
 | Voice | Kokoro | Piper | Local, offline after model download |
-| Visuals | SDXL Turbo | procedural/local assets; optional hosted providers | Local by default |
+| Visuals | Z-Image-Turbo via MFLUX/MLX | required local AI generation; no image search | Apple Silicon Mac |
 | Render | FFmpeg + Pillow | — | Local |
 | Publish | YouTube / Meta APIs | — | Internet and platform quotas apply |
 
@@ -49,7 +49,7 @@ The first model run downloads model weights; generation is then local. Model dow
 need disk space and initial internet access. Local inference is limited by the Mac's
 16 GB unified memory and may be slower than hosted services.
 
-## Local-first setup (Apple Silicon, 16 GB unified memory)
+## Local-first setup (Apple Silicon M4, 16 GB unified memory)
 
 1. Install the system renderer: `brew install ffmpeg`.
 2. Install Ollama, then download the ordered script models:
@@ -65,7 +65,7 @@ need disk space and initial internet access. Local inference is limited by the M
    ./scripts/setup.sh
    ```
 
-4. Install local AI engines (this is optional and downloads large Python packages):
+4. Install the local MFLUX image generator (Apple Silicon only; downloads the model on first generation):
 
    ```bash
    source .venv/bin/activate
@@ -79,18 +79,12 @@ need disk space and initial internet access. Local inference is limited by the M
    reelforge render --count 1
    ```
 
-Kokoro and the SDXL Turbo checkpoint download on first use. Piper is the voice
+Kokoro and the quantized Z-Image-Turbo model download on first use. Piper is the voice
 fallback and downloads its ONNX voice if it is not cached. The first setup needs
 internet; inference is local after the required packages and model weights are
-present. Keep batch concurrency low on 16 GB unified memory (start with one reel
-at a time). SDXL may be memory- or time-intensive on this configuration; if it
-causes memory pressure, reduce `visuals.ai_width` / `visuals.ai_height` or switch
-to a smaller compatible checkpoint after testing quality.
+present. Keep batch concurrency at one reel at a time on 16 GB unified memory. The pipeline starts with 4-bit Z-Image-Turbo at 512×768; this is a conservative starting point, not a guarantee that every other app can remain open during generation. If memory pressure occurs, close memory-heavy apps before rendering.
 
-The local-first configuration sets `visuals.remote_fallbacks: false`. That means
-a local image failure degrades to the existing procedural/local asset path rather
-than silently consuming a hosted free quota. You can opt into hosted fallback
-providers explicitly, but their quotas are not unlimited.
+The visual pipeline is intentionally local-only: each scene is generated from its prompt using Z-Image-Turbo through MFLUX (Apple MLX). There is no stock-image search, image picker, hosted inference API, or API key. If image generation fails, the render fails rather than silently substituting a gradient.
 
 ## Configuration
 
@@ -102,7 +96,7 @@ script.min_scenes          # 9-11 scenes of 10-14 words ≈ 35 s
 llm.models                 # ordered Ollama model fallback list
 voice.engine               # kokoro (primary) | piper (offline fallback)
 voice.name                 # en-US-AndrewNeural, en-IN-PrabhatNeural, ...
-visuals.provider           # procedural | pexels | local
+visuals.provider           # ai_cartoon (local MFLUX Z-Image-Turbo only)
 captions.mode              # auto | ass | png
 audio.target_lufs          # -16; both platforms normalise, quiet loses
 publish.youtube.privacy    # public | unlisted | private
@@ -112,40 +106,19 @@ publish.youtube.privacy    # public | unlisted | private
 (tracked in `work/reelforge.db`). Add topics; the `beats` list is the offline
 fallback and is used verbatim, so write it well.
 
-## Visual providers
+## Visual generation
 
-| provider | needs | when |
-|---|---|---|
-| `ai_cartoon` | `pip install -r requirements-ai.txt` (local SD) | default; AI illustrations, animated with zoom/pan |
-| `procedural` | nothing | zero-dependency fallback; looks identical across videos |
-| `pexels` | `PEXELS_API_KEY` (free, 200 req/h) | real licensed b-roll |
-| `local` | files in `assets/broll/` | your own footage |
+The only configured AI visual backend is `mflux_z_image`, backed by Tongyi-MAI's Z-Image-Turbo model through MFLUX/Apple MLX. The model weights are Apache-2.0 licensed. The 4-bit quantized configuration is chosen as a cautious starting point for a 16 GB M4; actual memory and generation speed must be validated on the Mac. Install with `pip install -r requirements-ai.txt`. Images are cached in `assets/cache/ai/<seed>.jpg`, so rerenders reuse generated scenes.
 
-### AI illustrations
+The channel uses cinematic-realism prompts, one generated image per scene, and slow alternating zoom/pan motion. `visuals.require_ai_images: true` prevents a failed generation from becoming a gradient placeholder. Remote image services and image-search providers are not used by the active pipeline.
 
-`ai_cartoon` runs local Stable Diffusion (`stabilityai/sdxl-turbo`) on Apple
-Silicon MPS at the configured 512×768 working resolution. The first run downloads
-the checkpoint. With `visuals.remote_fallbacks: false` (default), no hosted image
-service is contacted; a local generation failure falls back to the pipeline's
-existing procedural/local visual path.
-
-Set `visuals.remote_fallbacks: true` only if you explicitly want Cloudflare and
-Pollinations attempted after local failure. Their free allocations are finite,
-rate-limited, and can change; quota exhaustion is remembered for a cooldown so
-the same unavailable provider is not hammered once per scene.
-
-Every illustration is cached in `assets/cache/ai/<seed>.jpg`, so re-rendering a
-reel costs no generation time.
+Z-Image-Turbo is distributed under Apache 2.0, which permits commercial use subject to the licence conditions. Keep the model licence notice with the project and re-check the upstream model card before commercial release. A permissive model licence reduces licensing friction but cannot guarantee that every generated image is free of third-party rights claims.
 
 ### Animation
 
 `visuals.animate: true` applies a different slow motion to each scene — push in,
 pull out, pan left, pan right, cycled. Static stills in sequence read as a
 slideshow; alternating motion is what makes it read as video.
-
-Pexels is the one to switch to before publishing anything real. Procedural
-gradients across 50 reels is exactly the "mass-produced low-value" pattern that
-platforms demote.
 
 ## Music
 
@@ -288,77 +261,19 @@ hung request used to stall a whole reel.
 Measured end-to-end: **5 reels (10 scenes each, ~35 s) in ~19 minutes**, versus
 ~20 minutes for a single reel before the resolution fix.
 
-## Running it in the cloud, for free
+## Local scheduling
 
-The problem with scheduling this on a laptop: `launchd` does not fire if the Mac
-is asleep, and a closed laptop is a channel that silently stops posting.
+The image model runs on the M4 Mac, not GitHub-hosted Linux runners. Use the included
+macOS `launchd` scheduler only while the Mac is available and awake:
 
-The free answer is **GitHub Actions + Cloudflare Workers AI**. No VPS, no GPU, no
-card, no machine at home.
+```bash
+./scripts/schedule.sh install 09:00
+./scripts/schedule.sh remove
+```
 
-| Piece | Service | Free allowance |
-|---|---|---|
-| Schedule + compute | GitHub Actions | unmetered **on public repos** |
-| Images | Cloudflare Workers AI (`flux-1-schnell`) | 10,000 Neurons/day, no card (~200 images) |
-| Voice | `edge-tts` | unlimited |
-| Render | ffmpeg on the runner | CPU only, fine |
-| Publish | YouTube + Meta APIs | 6 YT uploads/day, 25 IG posts/day |
-| Instagram video host | GitHub **release asset** | no bucket needed |
-
-### Why these specific services
-
-- **Scheduled workflows only run on public repositories** on the GitHub Free plan.
-  Private repos need Pro. This is the single most common reason a free CI
-  schedule "just stops".
-- **Gemini's image API has no free tier** (quota stays at 0 until paid), so Google
-  is not an option for images even though you already have the account.
-- **Instagram fetches the video from a URL.** A GitHub release asset serves that
-  purpose, so R2 is optional rather than required.
-
-### Setup
-
-1. Repo must be **public**.
-2. Add secrets (Settings → Secrets and variables → Actions):
-
-   | Secret | From |
-   |---|---|
-   | `YT_CLIENT_SECRET_JSON` | the whole OAuth JSON, as one line |
-   | `YT_TOKEN_JSON` | `secrets/yt_token.json` after one local authorise |
-   | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` | Cloudflare dashboard |
-   | `IG_USER_ID`, `IG_ACCESS_TOKEN`, `FB_PAGE_ID`, `FB_PAGE_TOKEN` | `scripts/meta_setup.py` |
-
-3. **One flow, sequential and fail-fast.** The `reel` workflow builds a reel,
-   publishes it, then takes the next, and stops dead at the first failure:
-
-   ```
-   build announcing-the-plan  -> publish  LOST
-   STOPPED after 10 published. 11 reel(s) still queued.
-   ```
-
-   `count` defaults to `0` = keep going until something fails. Set `count: 1` to
-   publish a single episode. The topic that failed stays out of the ledger, so
-   the next run retries it — no duplicates, no lost work.
-4. Runs daily at `37 13 * * *` = **19:07 IST**, inside the evening posting
-   window. `:37` because GitHub's scheduler is worst at the top of the hour and
-   can drop runs entirely under load.
-
-### What changes in the cloud
-
-- **No LLM** — `script.mode: beats`, so scripts come from `config/topics.yaml`.
-  Write them in batches; that part is still yours.
-- **No sqlite** — the runner is wiped each time, so "what has been published"
-  lives in `state/published.json`, committed back by the workflow.
-- **No image cache** — 13 images are regenerated per reel, ~580 Neurons, about 6%
-  of the daily allowance.
-
-### The catch that matters
-
-In **Testing** mode the Google refresh token expires every **7 days**, so an
-unattended job fails weekly and you would not notice. Moving the OAuth app to
-**production** is no longer cosmetic — it is a precondition for this design.
-
-Also: GitHub disables scheduled workflows after **60 days** of repository
-inactivity. The ledger commit each run is what keeps it alive.
+The GitHub Actions reel workflow is now informational only. It does not generate
+images, invoke hosted image services, or publish videos. This avoids silently
+falling back to cloud image APIs or slow CPU inference.
 
 ## Layout
 

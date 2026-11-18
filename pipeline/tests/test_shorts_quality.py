@@ -1,10 +1,13 @@
-"""Regression tests for Shorts visual integrity and beat pacing."""
+"""Regression tests for Shorts pacing and local-only visual integrity."""
 from __future__ import annotations
 
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+
+from PIL import Image
 
 from reelforge import llm, visuals
 
@@ -13,9 +16,7 @@ class ShortsQualityTests(unittest.TestCase):
     def test_beat_selector_keeps_hook_tension_and_ending(self):
         topic = {
             "title": "A short test",
-            "beats": [
-                {"n": f"Line {i}", "v": f"visual {i}"} for i in range(13)
-            ],
+            "beats": [{"n": f"Line {i}", "v": f"visual {i}"} for i in range(13)],
         }
         script = llm._from_beats(topic, {"script.beats_max_scenes": 9})
         scenes = script["scenes"]
@@ -34,94 +35,37 @@ class ShortsQualityTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp, patch.object(
             visuals, "_ai_cache", return_value=Path(tmp)
         ), patch.object(visuals, "generate_image", return_value=None):
-            with self.assertRaisesRegex(RuntimeError, "refusing to render a gradient"):
+            with self.assertRaisesRegex(RuntimeError, "required local AI image unavailable"):
                 visuals.for_scene(cfg, None, 0, 3.0, "a clear subject", Path(tmp) / "scene.mp4")
 
-    def test_openverse_broadens_query_without_orientation_or_size_filters(self):
-        class Response:
-            status_code = 200
+    def test_non_ai_image_providers_are_rejected(self):
+        cfg = {"visuals.provider": "openverse"}
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaisesRegex(RuntimeError, "image search and stock pickers are removed"):
+                visuals.for_scene(cfg, None, 0, 3.0, "a clear subject", Path(tmp) / "scene.mp4")
 
-            def __init__(self, results):
-                self._results = results
-
-            def raise_for_status(self):
-                pass
-
-            def json(self):
-                return {"results": self._results}
-
-        found = [{"url": "https://images.example/book.jpg", "license": "cc0"}]
-        with patch.object(
-            visuals.requests, "get",
-            side_effect=[Response([]), Response(found)],
-        ) as get:
-            result = visuals._openverse_candidates("a desk with three open books")
-        self.assertEqual(result, found)
-        self.assertEqual(get.call_count, 2)
-        first_params = get.call_args_list[0].kwargs["params"]
-        second_params = get.call_args_list[1].kwargs["params"]
-        self.assertNotIn("aspect_ratio", first_params)
-        self.assertNotIn("size", first_params)
-        self.assertEqual(first_params["q"], "a desk with three open books")
-        self.assertEqual(first_params["page_size"], 20)
-        self.assertEqual(second_params["q"], "desk books")
-
-    def test_openverse_http_errors_include_response_details(self):
-        response = visuals.requests.Response()
-        response.status_code = 401
-        response.url = visuals.OPENVERSE_IMAGES
-        response.headers["x-request-id"] = "test-request-id"
-        response._content = b'{"detail":"invalid or missing credentials"}'
-        with patch.object(visuals.requests, "get", return_value=response):
-            with self.assertRaisesRegex(RuntimeError, "401.*invalid or missing credentials"):
-                visuals._openverse_candidates("a cup of tea")
-
-    def test_openverse_falls_back_to_main_subject(self):
-        class Response:
-            status_code = 200
-
-            def __init__(self, results):
-                self._results = results
-
-            def raise_for_status(self):
-                pass
-
-            def json(self):
-                return {"results": self._results}
-
-        found = [{"url": "https://images.example/tea.jpg", "license": "cc0"}]
-        with patch.object(
-            visuals.requests, "get",
-            side_effect=[Response([]), Response([]), Response(found)],
-        ) as get:
-            result = visuals._openverse_candidates("a spilled cup of dark tea")
-        self.assertEqual(result, found)
-        self.assertEqual(get.call_count, 3)
-        self.assertEqual(
-            [call.kwargs["params"]["q"] for call in get.call_args_list],
-            ["a spilled cup of dark tea", "cup tea", "tea"],
-        )
-
-    def test_empty_openverse_results_fail_instead_of_using_gradient(self):
-        cfg = {"visuals.provider": "openverse", "visuals.animate": False}
-        with tempfile.TemporaryDirectory() as tmp, patch.object(
-            visuals, "_openverse_candidates", return_value=[]
-        ):
-            with self.assertRaisesRegex(RuntimeError, "Openverse returned no CC0"):
-                visuals.for_scene(cfg, None, 0, 3.0, "an uncommon subject", Path(tmp) / "scene.mp4")
-
-    def test_cloudflare_quota_exhaustion_is_fatal(self):
-        cfg = {
-            "visuals.ai_backend": "cloudflare",
-            "visuals.cloud_no_local_fallback": True,
-        }
-        with tempfile.TemporaryDirectory() as tmp, patch.object(
-            visuals.fallback, "available", return_value=True
-        ), patch.object(visuals.fallback, "disable"), patch.object(
-            visuals, "_gen_cloudflare", side_effect=visuals.AiQuotaExhausted("quota exhausted")
-        ):
-            with self.assertRaises(visuals.AiQuotaExhausted):
+    def test_mflux_backend_is_the_only_generation_backend(self):
+        cfg = {"visuals.ai_backend": "cloudflare"}
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaisesRegex(RuntimeError, "only; remote image services are disabled"):
                 visuals.generate_image(cfg, "a clear subject", 123, Path(tmp) / "image.jpg")
+
+    def test_local_image_cache_is_verified_and_reused(self):
+        cfg = {"visuals.provider": "ai_cartoon", "visuals.animate": False}
+        query = "cached scene"
+        seed = int(hashlib.sha1(f"{query}|0".encode()).hexdigest()[:8], 16)
+        with tempfile.TemporaryDirectory() as tmp, patch.object(
+            visuals, "_ai_cache", return_value=Path(tmp)
+        ):
+            image_path = Path(tmp) / f"{seed:08x}.jpg"
+            Image.effect_noise((512, 512), 100).convert("RGB").save(image_path, quality=98)
+            with patch.object(visuals, "from_image", return_value=Path(tmp) / "scene.mp4"):
+                path, source = visuals.for_scene(
+                    cfg, type("Store", (), {"bump_visual": lambda *_: None})(),
+                    0, 3.0, query, Path(tmp) / "scene.mp4"
+                )
+            self.assertEqual(source.split(":")[0], "ai")
+
 
 
 if __name__ == "__main__":

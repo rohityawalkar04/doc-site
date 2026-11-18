@@ -63,26 +63,18 @@ def cmd_doctor(args) -> int:
 
     print("\nvisuals")
     provider = cfg.get("visuals.provider", "procedural")
-    key = os.environ.get("PEXELS_API_KEY", "").strip()
     if provider in ("ai_cartoon", "ai"):
-        backend = cfg.get("visuals.ai_backend", "local_sd")
-        line("ai backend", True, backend)
-        if backend == "local_sd":
+        backend = cfg.get("visuals.ai_backend", "mflux_z_image")
+        line("ai backend", backend == "mflux_z_image", backend)
+        if backend == "mflux_z_image":
             try:
-                import torch
-                from diffusers import AutoPipelineForText2Image  # noqa: F401
-                line("local diffusion", True,
-                     f"torch {torch.__version__}, mps={torch.backends.mps.is_available()}, "
-                     f"{cfg.get('visuals.local_model')}")
+                from mflux.models.z_image import ZImageTurbo  # noqa: F401
+                supported = sys.platform == "darwin" and __import__("platform").machine() == "arm64"
+                line("MFLUX runtime", supported, "Apple Silicon MLX" if supported else "requires Apple Silicon macOS")
             except ImportError:
-                line("local diffusion", False, "pip install -r requirements-ai.txt")
+                line("MFLUX runtime", False, "pip install -r requirements-ai.txt")
         line("animate", bool(cfg.get("visuals.animate", True)),
              "zoom/pan per scene")
-    elif provider == "pexels":
-        line("pexels key", bool(key), "set PEXELS_API_KEY" if not key else "present")
-    elif provider == "local":
-        n = len(visuals._local_files())
-        line("local b-roll", n > 0, f"{n} files in assets/broll/")
     else:
         line("procedural", True, "no keys needed")
 
@@ -295,7 +287,7 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--count", type=int, default=1)
     r.add_argument("--topic", help="render one specific topic id")
     r.add_argument("--from-beats", action="store_true", help="skip the LLM, use beats")
-    r.add_argument("--provider", help="procedural | ai_cartoon | pexels | local")
+    r.add_argument("--provider", help="ai_cartoon (local MFLUX only)")
     r.add_argument("--clean", action="store_true", help="delete per-reel work dir")
     r.add_argument("--stop-on-error", action="store_true")
     r.set_defaults(fn=cmd_render)
