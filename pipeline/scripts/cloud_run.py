@@ -116,14 +116,11 @@ def main() -> int:
 
     cfg = config.load()
     cfg.override("script.mode", "beats")          # no LLM in CI
-    cfg.override("visuals.provider", "pexels")
+    cfg.override("visuals.provider", "openverse")
 
-    # Stock visuals are required for every scene. Fail before rendering rather
-    # than silently producing gradient placeholders.
-    if not os.environ.get("PEXELS_API_KEY", "").strip():
-        print("::error title=Visual backend::PEXELS_API_KEY is required for free stock visuals")
-        return 1
-    print("preflight: Pexels stock visuals configured")
+    # Openverse supports anonymous image search. No API key or paid inference
+    # account is required; CC0-only results keep monetized-use licensing simple.
+    print("preflight: Openverse anonymous CC0 visuals configured")
 
     # A build-only run publishes nothing, so it must not require publish
     # credentials. Demanding the YouTube token here is what failed the first
