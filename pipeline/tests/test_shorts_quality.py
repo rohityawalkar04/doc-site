@@ -1,6 +1,7 @@
 """Regression tests for Shorts visual integrity and beat pacing."""
 from __future__ import annotations
 
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -36,6 +37,20 @@ class ShortsQualityTests(unittest.TestCase):
         ), patch.object(visuals, "generate_image", return_value=None):
             with self.assertRaisesRegex(RuntimeError, "refusing to render a gradient"):
                 visuals.for_scene(cfg, None, 0, 3.0, "a clear subject", Path(tmp) / "scene.mp4")
+
+    def test_missing_pexels_key_fails_instead_of_using_gradient(self):
+        cfg = {"visuals.provider": "pexels", "visuals.animate": False}
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {}, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "PEXELS_API_KEY is required"):
+                visuals.for_scene(cfg, None, 0, 3.0, "a clear subject", Path(tmp) / "scene.mp4")
+
+    def test_empty_pexels_results_fail_instead_of_using_gradient(self):
+        cfg = {"visuals.provider": "pexels", "visuals.animate": False}
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(
+            os.environ, {"PEXELS_API_KEY": "test-key"}, clear=True
+        ), patch.object(visuals, "_pexels_candidates", return_value=[]):
+            with self.assertRaisesRegex(RuntimeError, "Pexels returned no usable"):
+                visuals.for_scene(cfg, None, 0, 3.0, "an uncommon subject", Path(tmp) / "scene.mp4")
 
     def test_cloudflare_quota_exhaustion_is_fatal(self):
         cfg = {
