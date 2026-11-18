@@ -163,6 +163,18 @@ jobs:
             exit 1
           }
 
+      - name: Reconcile the ledger with the channel
+        if: always()
+        run: |
+          # A guard is a belief; this is the proof. Runs even on failure, because an
+          # upload that landed before an error must still be reconciled against the
+          # ledger. Exit 1 means the channel knows something the ledger does not -
+          # exactly the state that produced the 16 Nov duplicates.
+          PYTHONPATH=src python scripts/check_channel.py || {
+            echo "::error title=Channel drift::the channel and state/published.json disagree - reconcile before the next run"
+            exit 1
+          }
+
       - name: Upload the renders for inspection
         if: always()
         uses: actions/upload-artifact@v4

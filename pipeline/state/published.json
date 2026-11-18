@@ -1,21 +1,98 @@
 {
   "published": [
-    "five-minute-rule",
-    "ekalavya",
-    "hanumans-strength",
-    "odysseus-mast",
-    "sisyphus",
-    "yaksha-prashna",
-    "consuming-is-not-doing",
-    "not-lazy-one-feeling",
-    "boredom-is-the-tax",
-    "standards-block-first-draft",
-    "announcing-the-plan",
-    "identity-not-motivation",
-    "environment-over-willpower",
-    "finish-not-start",
-    "say-no-shrink-list",
-    "comparison-highlight-reel"
+    {
+      "topic_id": "five-minute-rule",
+      "title": "The five-minute rule that ends procrastination",
+      "video_id": "-jj7As4iK0g",
+      "published_at": "2026-11-15"
+    },
+    {
+      "topic_id": "ekalavya",
+      "title": "Ekalavya was refused a teacher, so he built one",
+      "video_id": "2rJPNWOyYoA",
+      "published_at": "2026-11-15"
+    },
+    {
+      "topic_id": "hanumans-strength",
+      "title": "Hanuman forgot what he was capable of",
+      "video_id": "TVvjT-LTvAw",
+      "published_at": "2026-11-15"
+    },
+    {
+      "topic_id": "odysseus-mast",
+      "title": "Odysseus tied himself to the mast",
+      "video_id": "pzRQUjO1uC0",
+      "published_at": "2026-11-15"
+    },
+    {
+      "topic_id": "sisyphus",
+      "title": "Sisyphus, and why the rock is not the punishment",
+      "video_id": "OwUgqi6zFo8",
+      "published_at": "2026-11-15"
+    },
+    {
+      "topic_id": "yaksha-prashna",
+      "title": "The yaksha asked what the greatest wonder is",
+      "video_id": "hXL5zKscc3g",
+      "published_at": "2026-11-15"
+    },
+    {
+      "topic_id": "consuming-is-not-doing",
+      "title": "Watching advice is not discipline",
+      "video_id": "SPQfr4rCiZw",
+      "published_at": "2026-11-15"
+    },
+    {
+      "topic_id": "not-lazy-one-feeling",
+      "title": "You are not lazy. You are avoiding one feeling.",
+      "video_id": "hXqyn5TH_wc",
+      "published_at": "2026-11-15"
+    },
+    {
+      "topic_id": "boredom-is-the-tax",
+      "title": "You do not quit because it is hard",
+      "video_id": "b2N-_zLQwDQ",
+      "published_at": "2026-11-15"
+    },
+    {
+      "topic_id": "standards-block-first-draft",
+      "title": "Your standards are why you have not started",
+      "video_id": "CuyIYORZ7V0",
+      "published_at": "2026-11-15"
+    },
+    {
+      "topic_id": "announcing-the-plan",
+      "title": "Announcing the plan is the reward",
+      "published_at": "2026-11-16"
+    },
+    {
+      "topic_id": "identity-not-motivation",
+      "title": "You do not need more motivation",
+      "published_at": "2026-11-16"
+    },
+    {
+      "topic_id": "environment-over-willpower",
+      "title": "You are losing to your room, not your weakness",
+      "published_at": "2026-11-16"
+    },
+    {
+      "topic_id": "finish-not-start",
+      "title": "You are short of finished things, not ideas",
+      "video_id": "LT-q87IFkac",
+      "published_at": "2026-11-17"
+    },
+    {
+      "topic_id": "say-no-shrink-list",
+      "title": "You need a shorter list, not a better one",
+      "video_id": "Ke2D5x0GQPM",
+      "published_at": "2026-11-17"
+    },
+    {
+      "topic_id": "comparison-highlight-reel",
+      "title": "You are comparing your Tuesday to their highlights",
+      "video_id": "SwIm-qSxcVg",
+      "published_at": "2026-11-17"
+    }
   ],
   "last_published": "2026-11-17"
 }

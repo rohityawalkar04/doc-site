@@ -112,8 +112,11 @@ def publish(cfg, store: state.Store, reel_id: str, platforms: list[str],
 
         store.record_pub(reel_id, platform, out["remote_id"], out.get("url", ""))
         # Keep the committed ledger in step with local publishing, or CI
-        # re-uploads reels that are already live.
-        ledger.add(reel.get("topic_id"))
+        # re-uploads reels that are already live. Record the title and the id the
+        # platform accepted, so the ledger can be reconciled against the channel
+        # later - a list of topic ids cannot be joined to anything.
+        ledger.add(reel.get("topic_id"), title=meta.get("title"),
+                   video_id=out.get("remote_id") if platform == "youtube" else None)
         print(f"     done {out.get('url') or out['remote_id']}")
         results[platform] = out
 

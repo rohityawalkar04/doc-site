@@ -324,6 +324,14 @@ card, no machine at home.
 6. Runs daily at `37 13 * * *` = **19:07 IST**, inside the evening posting
    window. `:37` because GitHub's scheduler is worst at the top of the hour and
    can drop runs entirely under load.
+7. **Every run ends by reconciling the ledger with the channel.**
+   `scripts/check_channel.py` reads the feed, maps each video back to a ledger
+   topic, and fails the run if the channel holds anything the ledger does not
+   know about - the exact state that produced the 16 Nov duplicates. It also
+   reports titles that exist twice on the channel, and ledger topics with no
+   video on the channel (deleted or unlisted: five mythology reels are in that
+   state as of 18 Nov). Run it by hand any time:
+   `cd pipeline && PYTHONPATH=src python scripts/check_channel.py`.
 
 ### What changes in the cloud
 
