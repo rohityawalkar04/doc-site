@@ -324,9 +324,10 @@ card, no machine at home.
 6. Runs at `37 13 * * *` = **19:07 IST** and again at `7 14 * * *` = **19:37 IST**,
    both inside the evening posting window. `:37` because GitHub's scheduler is
    worst at the top of the hour and drops runs under load - this repo saw one
-   schedule event in three days. The second trigger is the fallback, and
-   `--once-per-day` turns it into a no-op once a reel has published that UTC day,
-   so a doubled run costs nothing.
+   schedule event in three days. The second trigger is the fallback, and on
+   **scheduled** runs `--once-per-day` turns it into a no-op once a reel has
+   published that UTC day. A manual dispatch is never suppressed: it is a person
+   asking for a reel. Use `count: 1` for one, the default `0` for the whole queue.
 7. **Every run ends by reconciling the ledger with the channel.**
    `scripts/check_channel.py` reads the feed, maps each video back to a ledger
    topic, and fails the run if the channel holds anything the ledger does not

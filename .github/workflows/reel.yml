@@ -161,10 +161,16 @@ jobs:
           AI_BACKEND: cloudflare
           PYTHONUNBUFFERED: "1"
         run: |
+          # --once-per-day is a scheduler guard, not a publishing guard. It exists so
+          # the 19:37 IST fallback cron cannot publish a second time after the 19:07
+          # one succeeded. A workflow_dispatch is a person asking for a reel and must
+          # be answered - on 19 Nov a manual `count: 1` run exited with "already
+          # published on 2026-11-19; nothing to do" because this flag was passed for
+          # every trigger.
           PYTHONPATH=src python -u scripts/cloud_run.py \
             --count "${{ github.event.inputs.count || '0' }}" \
             --record \
-            --once-per-day \
+            ${{ github.event_name == 'schedule' && '--once-per-day' || '' }} \
             ${{ github.event.inputs.mode == 'dry-run' && '--dry-run' || '' }}
 
       # Saved even when the build fails: a run that died at scene 6 of 13 has six

@@ -123,8 +123,9 @@ def main() -> int:
     ap.add_argument("--build-only", action="store_true",
                     help="build reels for review; publish nothing and leave the ledger alone")
     ap.add_argument("--once-per-day", action="store_true",
-                    help="exit if a reel was already published today (UTC); makes "
-                         "redundant scheduled triggers safe")
+                    help="exit if a reel was already published today (UTC). For "
+                         "scheduled triggers only: it makes a redundant cron free, and "
+                         "would swallow a manual request for another reel")
     ap.add_argument("--record", action="store_true",
                     help="commit and push the ledger after every upload, and stop the "
                          "batch if that push fails (CI: one lost push = one duplicate, "
