@@ -443,8 +443,13 @@ def _gen_cloudflare(cfg, prompt: str, seed: int, dest: Path) -> Path | None:
 def generate_image(cfg, query: str, seed: int, dest: Path) -> Path | None:
     """Generate one illustration. Cached on disk by seed, so re-renders are free."""
     if dest.exists() and dest.stat().st_size > 5000:
+        print(f"    [AI cache HIT] {dest.name} ({dest.stat().st_size:,} bytes)")
         return dest
 
+    if dest.exists():
+        # A prior interrupted download must not be mistaken for a valid cache entry.
+        dest.unlink()
+    print(f"    [AI cache MISS] {dest.name}; requesting a new illustration")
     prompt = build_prompt(cfg, query)
     backend = cfg.get("visuals.ai_backend", "local_sd")
 
