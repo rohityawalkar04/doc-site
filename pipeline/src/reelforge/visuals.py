@@ -494,11 +494,35 @@ def for_scene(cfg, store, index: int, seconds: float, query: str, out: Path,
         # scenes share a visual_query, but stable across re-renders.
         seed = int(hashlib.sha1(f"{query}|{index}".encode()).hexdigest()[:8], 16)
         dest = _ai_cache() / f"{seed:08x}.jpg"
-        img = generate_image(cfg, query, seed, dest)
+        if os.environ.get("AI_CACHE_ONLY", "").strip() == "1":
+            # CI cache-only mode: never call a hosted image API on a cache miss.
+            # Reuse another previously generated illustration when possible; if
+            # the cache has no spare image, use the procedural fallback below.
+            if dest.exists() and dest.stat().st_size > 5000:
+                img = dest
+                visual_id = f"ai:{seed:08x}"
+                print(f"    [AI cache HIT] {dest.name} ({dest.stat().st_size:,} bytes)")
+            else:
+                cached = [
+                    p for p in sorted(_ai_cache().glob("*.jpg"))
+                    if p != dest and p.stat().st_size > 5000 and p.name not in used
+                ]
+                if cached:
+                    img = cached[index % len(cached)]
+                    used.add(img.name)
+                    visual_id = f"ai-cache-fallback:{img.stem}"
+                    print(f"    [AI cache FALLBACK] {img.name} for uncached scene {dest.name}")
+                else:
+                    img = None
+                    visual_id = ""
+                    print(f"    [AI cache EMPTY] no reusable image for {dest.name}; using procedural")
+        else:
+            img = generate_image(cfg, query, seed, dest)
+            visual_id = f"ai:{seed:08x}"
         if img is not None:
-            store.bump_visual(f"ai:{seed:08x}")
-            return from_image(cfg, img, seconds, out, motion), f"ai:{seed:08x}"
-        print("    ! AI image unavailable after retries, using procedural")
+            store.bump_visual(visual_id)
+            return from_image(cfg, img, seconds, out, motion), visual_id
+        print("    ! AI illustration unavailable; using procedural")
 
     if provider == "pexels":
         key = os.environ.get("PEXELS_API_KEY", "").strip()
