@@ -173,6 +173,21 @@ jobs:
             ${{ github.event_name == 'schedule' && '--once-per-day' || '' }} \
             ${{ github.event.inputs.mode == 'dry-run' && '--dry-run' || '' }}
 
+      - name: Report illustration cache
+        shell: bash
+        run: |
+          cache_dir="pipeline/assets/cache/ai"
+          mkdir -p "$cache_dir"
+          count="$(find "$cache_dir" -maxdepth 1 -type f -name '*.jpg' | wc -l | tr -d ' ')"
+          size="$(du -sh "$cache_dir" | cut -f1)"
+          echo "AI illustration cache: $count image(s), $size"
+          if [ "$count" -gt 0 ]; then
+            echo "Cached image filenames (first 10):"
+            find "$cache_dir" -maxdepth 1 -type f -name '*.jpg' -printf '%f\\n' | sort | head -10
+          else
+            echo "::notice title=Empty illustration cache::This run will need fresh image generation for every scene."
+          fi
+
       # Saved even when the build fails: a run that died at scene 6 of 13 has six
       # images worth keeping, and the retry must not pay for them again. The guard
       # keeps the step quiet on runs that produced nothing.
