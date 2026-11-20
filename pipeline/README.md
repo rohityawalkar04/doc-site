@@ -102,6 +102,13 @@ It is wired as a secondary attempt, not the default.
 Every illustration is cached in `assets/cache/ai/<seed>.jpg`, so re-rendering a
 reel costs no generation time.
 
+In GitHub Actions, this directory is restored from and saved to the repository's
+Actions cache (it is intentionally git-ignored, not committed to the source repo).
+The workflow reports the restored image count and size before rendering, and the
+renderer logs an explicit `AI cache HIT` or `AI cache MISS` for each scene.
+A cache hit reuses the original image without calling Cloudflare Workers AI; a
+new topic/visual query still needs one fresh image generation the first time.
+
 ### Animation
 
 `visuals.animate: true` applies a different slow motion to each scene — push in,
