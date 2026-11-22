@@ -233,6 +233,9 @@ def build_prompt(cfg, query: str) -> str:
 
 
 _PIPE = None
+# Once Cloudflare reports its daily quota is exhausted, do not keep spending
+# requests on every remaining scene in this process.
+_AI_QUOTA_EXHAUSTED = False
 
 
 def _local_pipe(cfg):
@@ -463,8 +466,18 @@ def generate_image(cfg, query: str, seed: int, dest: Path) -> Path | None:
         "pollinations": [_gen_pollinations, _gen_cloudflare, _gen_local],
     }.get(backend, [_gen_local, _gen_cloudflare, _gen_pollinations])
 
+    global _AI_QUOTA_EXHAUSTED
+    if _AI_QUOTA_EXHAUSTED:
+        print("    ! Cloudflare quota already exhausted in this run; skipping further AI requests")
+        return None
+
     for gen in order:
-        img = gen(cfg, prompt, seed, dest)
+        try:
+            img = gen(cfg, prompt, seed, dest)
+        except AiQuotaExhausted as e:
+            _AI_QUOTA_EXHAUSTED = True
+            print(f"    ! {e}")
+            return None
         if img is not None:
             return img
     return None
@@ -494,31 +507,33 @@ def for_scene(cfg, store, index: int, seconds: float, query: str, out: Path,
         # scenes share a visual_query, but stable across re-renders.
         seed = int(hashlib.sha1(f"{query}|{index}".encode()).hexdigest()[:8], 16)
         dest = _ai_cache() / f"{seed:08x}.jpg"
-        if os.environ.get("AI_CACHE_ONLY", "").strip() == "1":
-            # CI cache-only mode: never call a hosted image API on a cache miss.
-            # Reuse another previously generated illustration when possible; if
-            # the cache has no spare image, use the procedural fallback below.
-            if dest.exists() and dest.stat().st_size > 5000:
-                img = dest
-                visual_id = f"ai:{seed:08x}"
-                print(f"    [AI cache HIT] {dest.name} ({dest.stat().st_size:,} bytes)")
-            else:
-                cached = [
-                    p for p in sorted(_ai_cache().glob("*.jpg"))
-                    if p != dest and p.stat().st_size > 5000 and p.name not in used
-                ]
-                if cached:
-                    img = cached[index % len(cached)]
-                    used.add(img.name)
-                    visual_id = f"ai-cache-fallback:{img.stem}"
-                    print(f"    [AI cache FALLBACK] {img.name} for uncached scene {dest.name}")
-                else:
-                    img = None
-                    visual_id = ""
-                    print(f"    [AI cache EMPTY] no reusable image for {dest.name}; using procedural")
+        if dest.exists() and dest.stat().st_size > 5000:
+            img = dest
+            visual_id = f"ai:{seed:08x}"
+            print(f"    [AI cache HIT] {dest.name} ({dest.stat().st_size:,} bytes)")
+        elif os.environ.get("AI_CACHE_ONLY", "").strip() == "1" or _AI_QUOTA_EXHAUSTED:
+            # On quota exhaustion, reuse a different cached illustration rather
+            # than failing the entire reel. If no cached image exists, procedural
+            # visuals keep the render moving without another paid/quota request.
+            img = None
+            visual_id = ""
         else:
             img = generate_image(cfg, query, seed, dest)
-            visual_id = f"ai:{seed:08x}"
+            visual_id = f"ai:{seed:08x}" if img is not None else ""
+
+        if img is None:
+            cached = [
+                p for p in sorted(_ai_cache().glob("*.jpg"))
+                if p != dest and p.is_file() and p.stat().st_size > 5000 and p.name not in used
+            ]
+            if cached:
+                img = cached[index % len(cached)]
+                used.add(img.name)
+                visual_id = f"ai-cache-fallback:{img.stem}"
+                print(f"    [AI cache FALLBACK] {img.name} for uncached scene {dest.name}")
+            else:
+                print(f"    [AI cache EMPTY] no reusable image for {dest.name}; using procedural")
+
         if img is not None:
             store.bump_visual(visual_id)
             return from_image(cfg, img, seconds, out, motion), visual_id
