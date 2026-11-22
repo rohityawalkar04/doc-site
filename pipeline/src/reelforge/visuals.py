@@ -26,11 +26,11 @@ POLLINATIONS = "https://image.pollinations.ai/prompt/{prompt}"
 
 
 class AiQuotaExhausted(RuntimeError):
-    """Raised when the image backend has no allocation left.
+    """Raised when the hosted image backend has no allocation left.
 
-    Deliberately fatal: carrying on fills the reel with gradient placeholders,
-    which wastes the whole run and looks broken on a channel that publishes
-    illustrations.
+    generate_image catches this condition once per process. The reel continues
+    with distinct cached illustrations where available, then procedural visuals
+    only when the cache has no reusable image.
     """
 
 # Zoom/pan variants, cycled per scene. A reel where every shot pushes in at the
