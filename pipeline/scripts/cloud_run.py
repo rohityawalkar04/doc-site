@@ -186,7 +186,7 @@ def main() -> int:
     # seconds instead of at scene 9 of 13 after forty minutes - and before the
     # day's neurons are spent finding out.
     if not args.skip_health:
-        checks = health.check(cfg)
+        checks = health.check(cfg, fmt=args.format)
         if not health.report(checks):
             first = next((c for c in checks if not c.ok), None)
             print("::error title=Health check failed::"

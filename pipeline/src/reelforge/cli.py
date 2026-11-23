@@ -120,8 +120,9 @@ def cmd_health(args) -> int:
     from . import health
 
     cfg = _boot()
+    cfg.apply_format(args.format)
     checks = health.check(cfg, images=not args.skip_images,
-                          voice_check=not args.skip_voice)
+                          voice_check=not args.skip_voice, fmt=args.format)
     if args.json:
         print(health.as_json(checks))
         return 0 if all(c.ok for c in checks) else 1
@@ -304,7 +305,7 @@ def cmd_run(args) -> int:
     if not getattr(args, "skip_health", False):
         from . import health
 
-        if not health.report(health.check(cfg)):
+        if not health.report(health.check(cfg, fmt=fmt)):
             print("\n  refusing to build: fix the resource above, or pass --skip-health")
             return 1
     store = state.Store(cfg.db)
@@ -333,6 +334,7 @@ def main(argv: list[str] | None = None) -> int:
                     help="do not call the image model (saves tokens, checks nothing)")
     hc.add_argument("--skip-voice", action="store_true", help="do not call the TTS engine")
     hc.add_argument("--json", action="store_true", help="machine-readable output")
+    hc.add_argument("--format", default="reel", help="check the resources of this format")
     hc.set_defaults(fn=cmd_health)
 
     tp = sub.add_parser("topics", help="the runtime topic bank")

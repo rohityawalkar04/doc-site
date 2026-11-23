@@ -141,17 +141,27 @@ def _voice_check(cfg, tmp: Path) -> Check:
     return Check("voice", engine, ok, detail)
 
 
-def _topics_check(cfg):
-    """The subject matter is a resource too - but only when it is the one in use.
+def _topics_check(cfg, fmt: str = "reel"):
+    """The subject matter is a resource too - but only the one in use.
 
     Two different questions, and conflating them blocked every run after the first
     composed reel: the bank can hold *defects* (a malformed theme) and it can be
     *spent* (every title used). A used title is not a defect; only a spent bank
     means tonight cannot be built.
+
+    A non-reel format has a written queue and never composes, so its bank is not
+    the resource in play: validating the 13-scene bank against a 30-scene format
+    reports every theme as malformed, which is exactly how the first video run
+    failed its gate.
     """
     def run():
         done = set(ledger.load())
-        left = [t for t in config.load_topics() if str(t["id"]) not in done]
+        left = [t for t in config.load_topics(fmt) if str(t["id"]) not in done]
+        if fmt != "reel":
+            if not left:
+                return False, (f"no unpublished topic in config/topics-{fmt}.yaml - "
+                               f"the {fmt} build does not compose, so write one")
+            return True, f"{len(left)} {fmt} topic(s) queued"
         if left:
             return True, f"{len(left)} written topic(s) queued - the bank is not needed"
         problems = topics.check_bank(cfg)
@@ -167,7 +177,7 @@ def _topics_check(cfg):
 
 # --------------------------------------------------------------------------- entry points
 def check(cfg, *, images: bool = True, voice_check: bool = True,
-          tmp: Path | None = None) -> list[Check]:
+          tmp: Path | None = None, fmt: str = "reel") -> list[Check]:
     """Run every probe. Returns the findings; printing is `report`'s job."""
     created = tmp is None
     work = Path(tmp) if tmp is not None else Path(tempfile.mkdtemp(prefix="rf-health-"))
@@ -178,7 +188,7 @@ def check(cfg, *, images: bool = True, voice_check: bool = True,
             _timed("environment", "ffmpeg + ffprobe", _ffmpeg_check(work)),
             _timed("disk", "work + out", _disk_check(cfg)),
             _timed("script", "language model", _script_check(cfg)),
-            _timed("topics", "topic source", _topics_check(cfg)),
+            _timed("topics", "topic source", _topics_check(cfg, fmt)),
         ]
         if cfg.get("captions.enabled", True):
             checks.append(_timed("captions", "font", _captions_check(cfg)))
@@ -231,11 +241,14 @@ def main(argv: list[str] | None = None) -> int:
                     help="do not call the image model (saves the tokens, checks nothing)")
     ap.add_argument("--skip-voice", action="store_true", help="do not call the TTS engine")
     ap.add_argument("--json", action="store_true", help="machine-readable output")
+    ap.add_argument("--format", default="reel", help="check the resources of this format")
     args = ap.parse_args(argv)
 
     cfg = config.load()
+    cfg.apply_format(args.format)
     os.environ.setdefault("REELFORGE_ROOT", str(config.ROOT))
-    checks = check(cfg, images=not args.skip_images, voice_check=not args.skip_voice)
+    checks = check(cfg, images=not args.skip_images, voice_check=not args.skip_voice,
+                   fmt=args.format)
     if args.json:
         print(as_json(checks))
         return 0 if all(c.ok for c in checks) else 1
