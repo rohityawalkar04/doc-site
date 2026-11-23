@@ -30,6 +30,15 @@ if [ ! -f state/published.json ]; then
 fi
 
 git add state/ 2>/dev/null || true
+# A topic composed at runtime is written by the build, so it travels with the
+# ledger: the ledger says it published, this file says what it said. Only that
+# one path is added - never config/ as a whole, which would sweep unrelated
+# working changes into the bot's commit. Without this line the composed topic is
+# written on the runner and thrown away with the workspace, so the channel's
+# script history is a ledger entry with a title and nothing else.
+if [ -f config/topics-generated.yaml ]; then
+  git add config/topics-generated.yaml 2>/dev/null || true
+fi
 if git diff --cached --quiet; then
   echo "  ledger unchanged"
   exit 0

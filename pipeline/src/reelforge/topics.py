@@ -199,11 +199,14 @@ def save_generated(cfg, topic: dict) -> Path:
 
 # --------------------------------------------------------------------------- bank check
 def check_bank(cfg) -> list[str]:
-    """Validate every sentence a person wrote, against the rules a script faces.
+    """Structural and editorial defects in the bank. Compose nothing.
 
     The bank is data, and data drifts: a sentence edited past the word range, a
-    title that now collides with a published reel, a theme missing a visual. This
-    reports all of it without generating anything.
+    theme missing a visual, two titles that are the same. This reports those.
+
+    A title that has *already been used* is deliberately not a defect - it is
+    one title fewer for the rotation, which `remaining()` reports. Treating it as
+    a defect made the health gate fail permanently after the first composed reel.
     """
     problems: list[str] = []
     bank = load_bank(cfg)
@@ -215,7 +218,6 @@ def check_bank(cfg) -> list[str]:
     wmin, wmax = cfg.get("script.words_per_scene", [8, 14])
     lo, hi = max(3, int(wmin * 0.55)), int(wmax * 1.6)
     n_scenes = int(cfg.get("script.min_scenes", 13))
-    titles, ids = known()
 
     seen_titles: set[str] = set()
     for theme in bank["themes"]:
@@ -240,11 +242,26 @@ def check_bank(cfg) -> list[str]:
             if key in seen_titles:
                 problems.append(f"{tid}: duplicate title within the bank: {t!r}")
             seen_titles.add(key)
-            if key in titles:
-                problems.append(f"{tid}: title is already published: {t!r}")
-            if slug(str(t)) in ids:
-                problems.append(f"{tid}: title slug is already a topic id: {t!r}")
     return problems
+
+
+def remaining(cfg) -> tuple[int, int]:
+    """(titles the rotation can still use, titles the bank holds).
+
+    This is the number that decides whether a composed reel is possible tonight:
+    the ledger and the topic files are consulted, so a title published by an
+    earlier run is spent.
+    """
+    bank = load_bank(cfg)
+    used_titles, used_ids = known()
+    spent = sum(
+        1
+        for theme in bank["themes"]
+        for title in theme.get("titles") or []
+        if title_key(str(title)) in used_titles or slug(str(title)) in used_ids
+    )
+    total = capacity(bank)
+    return max(0, total - spent), total
 
 
 def capacity(bank: dict) -> int:
@@ -287,10 +304,9 @@ def main(argv: list[str] | None = None) -> int:
         for p in problems:
             print(f"  FAIL {p}")
         bank = load_bank(cfg)
-        titles_in_use, _ = known()
-        print(f"\ncapacity: {capacity(bank)} composed reel(s) before the titles run out "
+        left, total = remaining(cfg)
+        print(f"\ncapacity: {left} of {total} composed reel(s) still available "
               f"({len(bank['themes'])} themes)")
-        print(f"titles already spoken for: {len(titles_in_use)}")
         print(f"{'bank is clean' if not problems else f'{len(problems)} problem(s)'}\n")
         if problems:
             return 1

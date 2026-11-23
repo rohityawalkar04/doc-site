@@ -142,7 +142,13 @@ def _voice_check(cfg, tmp: Path) -> Check:
 
 
 def _topics_check(cfg):
-    """The subject matter is a resource too - but only when it is the one in use."""
+    """The subject matter is a resource too - but only when it is the one in use.
+
+    Two different questions, and conflating them blocked every run after the first
+    composed reel: the bank can hold *defects* (a malformed theme) and it can be
+    *spent* (every title used). A used title is not a defect; only a spent bank
+    means tonight cannot be built.
+    """
     def run():
         done = set(ledger.load())
         left = [t for t in config.load_topics() if str(t["id"]) not in done]
@@ -151,7 +157,11 @@ def _topics_check(cfg):
         problems = topics.check_bank(cfg)
         if problems:
             return False, f"{len(problems)} problem(s) in {topics.BANK}: {problems[0]}"
-        return True, "queue empty, bank clean - a topic will be composed at runtime"
+        available, total = topics.remaining(cfg)
+        if available <= 0:
+            return False, (f"queue empty and the bank is spent ({total} titles used) - "
+                           f"add themes or titles to {topics.BANK}")
+        return True, f"queue empty, bank clean - {available} of {total} composed reel(s) left"
     return run
 
 
