@@ -156,6 +156,18 @@ def authorise(cfg) -> Path:
     return token
 
 
+def watch_url(fmt: str, vid: str) -> str:
+    """Where the upload actually landed.
+
+    A Short lives on the Shorts surface; a 16:9 two-minute video does not, and
+    recording a /shorts/ link for it puts a dead URL in the ledger and in every
+    report built from it.
+    """
+    if (fmt or "reel") == "video":
+        return f"https://youtu.be/{vid}"
+    return f"https://youtube.com/shorts/{vid}"
+
+
 def upload(cfg, video: Path, meta: dict) -> dict:
     from googleapiclient.http import MediaFileUpload
 
@@ -223,4 +235,5 @@ def upload(cfg, video: Path, meta: dict) -> dict:
             f"      ! requested {requested}, got {actual}. Unaudited Google Cloud projects\n"
             "        force uploads private. Request the YouTube API audit to publish publicly."
         )
-    return {"remote_id": vid, "url": f"https://youtube.com/shorts/{vid}", "privacy": actual}
+    return {"remote_id": vid, "url": watch_url(meta.get("format", "reel"), vid),
+            "privacy": actual}

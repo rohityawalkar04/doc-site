@@ -28,7 +28,8 @@ def youtube_meta(meta: dict) -> dict:
     hashtags = list(dict.fromkeys(meta.get("hashtags", []) + extras))
     description += "\n\n" + " ".join(hashtags[:12])
     title = meta["title"][:100]
-    return {"title": title, "description": description.strip(), "tags": tags[:15]}
+    return {"title": title, "description": description.strip(), "tags": tags[:15],
+            "format": meta.get("format") or "reel"}
 
 
 def facebook_meta(meta: dict) -> str:
