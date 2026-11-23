@@ -40,3 +40,41 @@ topics:
   - n: Send the question you have been drafting for a week
     v: a hand reaching for a door handle
   theme: asking
+- id: you-are-waiting-to-feel-ready
+  title: You are waiting to feel ready
+  angle: Readiness is a result of motion, not a prerequisite for it. The feeling is real, it just arrives
+    second, and waiting for it first is the whole delay.
+  hashtags:
+  - '#procrastination'
+  - '#starting'
+  - '#discipline'
+  - '#mindset'
+  - '#motivation'
+  beats:
+  - n: You are not waiting for time, you are waiting for a feeling
+    v: a calendar with one empty square
+  - n: Rehearsal feels like progress, and it makes the first step heavier
+    v: a clock with its hands near midnight
+  - n: Name the smallest version of the thing you can finish tonight
+    v: a hand setting a cup down on a desk
+  - n: Start it badly, on purpose, with no plan to fix it
+    v: a pencil drawing a single straight line
+  - n: Set a timer for two minutes and stop when it rings
+    v: a shoe placed at the edge of a path
+  - n: Do the ugliest part first, while nobody is watching
+    v: a small lamp switched on in a dark room
+  - n: Write the next physical action, not the goal
+    v: a hand turning a page of a book
+  - n: Leave the work open when you stop, so restarting stays cheap
+    v: a short ladder leaning against a wall
+  - n: Repeat it tomorrow at the same hour, whatever the mood says
+    v: a single key laid on a table
+  - n: Cut the warm-up ritual down to one thing you cannot skip
+    v: a hand placing one block on top of another
+  - n: Tell one person you started, and let them ask about it
+    v: a footbridge over a narrow stream
+  - n: The feeling you wanted was on the other side of the first attempt
+    v: a path opening into a wide field
+  - n: Start badly tonight, and let tomorrow be the good one
+    v: a pen held above a blank page
+  theme: readiness
