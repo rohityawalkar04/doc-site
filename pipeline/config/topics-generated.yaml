@@ -1,0 +1,42 @@
+# Composed at runtime by reelforge.topics. Machine-owned: append-only, and
+# committed with the ledger so the channel stays auditable. Edit by hand if a
+# composed reel was bad, but do not reformat - the writer rewrites this file.
+topics:
+- id: asking-is-the-fastest-edit-you-have
+  title: Asking is the fastest edit you have
+  angle: A guess is not free, it is a loan against your own time. The awkward moment of asking is short,
+    and the wrong assumption it avoids can last a month.
+  hashtags:
+  - '#communication'
+  - '#work'
+  - '#confidence'
+  - '#mindset'
+  - '#discipline'
+  beats:
+  - n: The question is small, and the cost of not asking is not
+    v: a packed suitcase left beside a door
+  - n: The awkwardness lasts a moment and the wrong guess lasts a month
+    v: a bridge with one plank missing
+  - n: Write the question as one sentence with the decision attached
+    v: a hand opening a small notebook
+  - n: Name the two options you are choosing between out loud
+    v: a hand setting a cup down on a desk
+  - n: Send it early in the day, when people are still generous
+    v: a pencil drawing a single straight line
+  - n: Say what you already tried, so the answer is cheap to give
+    v: a shoe placed at the edge of a path
+  - n: Ask the person with the least to gain from flattering you
+    v: a small lamp switched on in a dark room
+  - n: Set a time after which you stop waiting and choose
+    v: a hand turning a page of a book
+  - n: Write down the answer before you act, while it is fresh
+    v: a short ladder leaning against a wall
+  - n: Thank them in one line and tell them what you did
+    v: a single key laid on a table
+  - n: Keep a list of the questions you were afraid to ask
+    v: a hand placing one block on top of another
+  - n: Asking gets faster each time, and the shame gets smaller
+    v: a single coin resting on an open palm
+  - n: Send the question you have been drafting for a week
+    v: a hand reaching for a door handle
+  theme: asking
