@@ -1,6 +1,8 @@
 """Command line entry point.
 
   reelforge doctor                      what works, what is missing
+  reelforge health                      call every model once, then decide
+  reelforge topics --check              validate the runtime topic bank
   reelforge plan                        script only, no render (cheap preview)
   reelforge render --count 2            build reels
   reelforge list                        recent reels and their status
@@ -110,6 +112,33 @@ def cmd_doctor(args) -> int:
 
     print(f"\n{'all good' if ok else 'some checks failed - see above'}\n")
     return 0 if ok else 1
+
+
+# --------------------------------------------------------------------------- health
+def cmd_health(args) -> int:
+    """Live gate: one real call per model and resource, before any build."""
+    from . import health
+
+    cfg = _boot()
+    checks = health.check(cfg, images=not args.skip_images,
+                          voice_check=not args.skip_voice)
+    if args.json:
+        print(health.as_json(checks))
+        return 0 if all(c.ok for c in checks) else 1
+    return 0 if health.report(checks) else 1
+
+
+# --------------------------------------------------------------------------- topics
+def cmd_topics(args) -> int:
+    """The runtime topic bank: validate it, or preview tonight's composition."""
+    from . import topics
+
+    argv: list[str] = []
+    if args.check:
+        argv.append("--check")
+    if args.next:
+        argv.append("--next")
+    return topics.main(argv)
 
 
 # --------------------------------------------------------------------------- plan
@@ -268,6 +297,12 @@ def cmd_run(args) -> int:
     cfg = _boot()
     if getattr(args, "provider", None):
         cfg.override("visuals.provider", args.provider)
+    if not getattr(args, "skip_health", False):
+        from . import health
+
+        if not health.report(health.check(cfg)):
+            print("\n  refusing to build: fix the resource above, or pass --skip-health")
+            return 1
     store = state.Store(cfg.db)
     built: list[str] = []
     for _ in range(args.count):
@@ -288,6 +323,18 @@ def main(argv: list[str] | None = None) -> int:
 
     d = sub.add_parser("doctor", help="check every dependency")
     d.set_defaults(fn=cmd_doctor)
+
+    hc = sub.add_parser("health", help="call every model once, then decide")
+    hc.add_argument("--skip-images", action="store_true",
+                    help="do not call the image model (saves tokens, checks nothing)")
+    hc.add_argument("--skip-voice", action="store_true", help="do not call the TTS engine")
+    hc.add_argument("--json", action="store_true", help="machine-readable output")
+    hc.set_defaults(fn=cmd_health)
+
+    tp = sub.add_parser("topics", help="the runtime topic bank")
+    tp.add_argument("--check", action="store_true", help="validate the bank, compose nothing")
+    tp.add_argument("--next", action="store_true", help="print the topic it would compose now")
+    tp.set_defaults(fn=cmd_topics)
 
     pl = sub.add_parser("plan", help="print the next script, render nothing")
     pl.set_defaults(fn=cmd_plan)
@@ -327,6 +374,8 @@ def main(argv: list[str] | None = None) -> int:
     rn.add_argument("--provider", help="procedural | ai_cartoon | pexels | local")
     rn.add_argument("--publish", action="store_true")
     rn.add_argument("--clean", action="store_true")
+    rn.add_argument("--skip-health", action="store_true",
+                    help="build without the live model probe first")
     rn.set_defaults(fn=cmd_run)
 
     args = p.parse_args(argv)

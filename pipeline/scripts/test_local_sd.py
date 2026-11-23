@@ -1,6 +1,5 @@
 """One-off smoke test for the local diffusion backend. Prints timings."""
 import time
-import hashlib
 from pathlib import Path
 
 from reelforge import config, visuals
@@ -16,7 +15,7 @@ queries = [
     "two hands passing a small folded note",
 ]
 for i, q in enumerate(queries):
-    seed = int(hashlib.sha1(f"{q}|{i}".encode()).hexdigest()[:8], 16)
+    seed = visuals.image_seed("local-sd-smoke", q, i)
     dest = d / f"{seed:08x}.jpg"
     t = time.time()
     img = visuals.generate_image(c, q, seed, dest)

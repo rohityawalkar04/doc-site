@@ -2,12 +2,12 @@
 from __future__ import annotations
 
 import json
-import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 
 from . import captions, captions_png, config, ledger, llm, render, state, visuals, voice
+from .text import slug  # noqa: F401 - re-exported: callers import pipeline.slug
 
 
 def log(msg: str) -> None:
@@ -16,19 +16,9 @@ def log(msg: str) -> None:
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
 
 
-def slug(text: str, limit: int = 52) -> str:
-    s = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
-    if len(s) <= limit:
-        return s
-    cut = s[:limit]
-    # Do not end on a half word: "capture-decisio" reads like a bug.
-    return cut.rsplit("-", 1)[0] if "-" in cut else cut
-
-
 def next_topic(cfg, store: state.Store) -> dict:
+    """The next thing to publish: the curated queue, then a composed topic."""
     topics = config.load_topics()
-    if not topics:
-        raise SystemExit("config/topics.yaml has no topics")
     for t in topics:
         # topics_used is this machine's history; the ledger is everyone's. A fresh
         # clone has an empty sqlite but a truthful ledger, so skipping on both is
@@ -36,7 +26,13 @@ def next_topic(cfg, store: state.Store) -> dict:
         if store.topic_used(str(t["id"])) or ledger.is_published(str(t["id"])):
             continue
         return t
-    raise SystemExit("all topics in config/topics.yaml are used - add more")
+    # Nothing left in the queue. Composing one here rather than failing is the
+    # difference between a channel that pauses and one that stops.
+    from . import topics as topics_mod
+
+    topic = topics_mod.generate(cfg)
+    print(f"  queue empty - composed {topic['title']!r} at runtime")
+    return topic
 
 
 def build(cfg, store: state.Store, topic: dict, keep_work: bool = True) -> dict:
@@ -89,7 +85,7 @@ def build(cfg, store: state.Store, topic: dict, keep_work: bool = True) -> dict:
         log(f"    scene {i}/{len(scenes)}: {scene['visual_query']!r}")
         vid, who = visuals.for_scene(
             cfg, store, i - 1, scene["seconds"], scene["visual_query"],
-            work / "visual" / f"s{i:02d}.mp4", used=used_visuals,
+            work / "visual" / f"s{i:02d}.mp4", used=used_visuals, reel=reel_id,
         )
         log(f"      -> {who} ({time.time() - tv:.1f}s)")
         scene["visual"] = who

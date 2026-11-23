@@ -13,7 +13,6 @@ Two traps worth knowing:
 from __future__ import annotations
 
 import os
-import re
 import sys
 import time
 import urllib.error
@@ -21,17 +20,13 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+from ..text import title_key  # noqa: F401 - re-exported: check_channel imports it here
+
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 API = "youtube"
 VERSION = "v3"
 FEED = "https://www.youtube.com/feeds/videos.xml?channel_id={cid}"
 ATOM = "{http://www.w3.org/2005/Atom}"
-
-
-def title_key(text: str) -> str:
-    """Comparable form of a title: case, accents-as-typed, spacing and punctuation
-    are not what tells two uploads apart - the words are."""
-    return re.sub(r"[^a-z0-9]+", " ", (text or "").casefold()).strip()
 
 
 def recent_titles(cfg, timeout: float = 15.0, attempts: int = 3) -> list[str] | None:

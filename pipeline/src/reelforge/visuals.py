@@ -226,6 +226,76 @@ def _ai_cache() -> Path:
     return p
 
 
+def image_seed(reel: str, query: str, index: int) -> int:
+    """Cache key for one illustration: this reel, this description, this position.
+
+    The reel id is in the key on purpose. Without it the cache was a channel-wide
+    pool: any two reels that asked for "a hand drawing a quick line" at scene 6
+    got byte-identical bytes, because nothing in the key named the reel - and the
+    quota fallback below then borrowed those images to fill other reels.
+
+    With the reel id in the key, a rebuild of the *same* reel is still free - the
+    property the 10,000-neuron daily budget depends on - and two reels cannot
+    collide. Files written before this change are simply never hit again.
+    """
+    return int(hashlib.sha1(f"{reel}|{query}|{index}".encode()).hexdigest()[:8], 16)
+
+
+def image_path(reel: str, seed: int) -> Path:
+    """Where one reel's illustration lives: `<reel>--<seed>.jpg`.
+
+    The reel is in the filename as well as the key so the directory can be listed
+    per reel - which is what lets a quota-stalled scene borrow an image from the
+    same reel and never from another one.
+    """
+    return _ai_cache() / f"{reel}--{seed:08x}.jpg"
+
+
+def backend_order(cfg) -> list:
+    """Generation backends to try, in order, for this config.
+
+    One definition: `generate_image` walks it, and `probe` reports on it, so a
+    health check can never promise a backend the build would not use.
+    """
+    backend = cfg.get("visuals.ai_backend", "local_sd")
+    return {
+        "local_sd": [_gen_local, _gen_cloudflare, _gen_pollinations],
+        # No pollinations for the cloud backend: it is throttled to ~1 in 5
+        # and costs ~60s per image in retries before falling back, which
+        # reads as a frozen build.
+        "cloudflare": [_gen_cloudflare, _gen_local],
+        "pollinations": [_gen_pollinations, _gen_cloudflare, _gen_local],
+    }.get(backend, [_gen_local, _gen_cloudflare, _gen_pollinations])
+
+
+def _backend_name(gen) -> str:
+    return {
+        _gen_local: "local diffusion",
+        _gen_cloudflare: "cloudflare workers ai",
+        _gen_pollinations: "pollinations",
+    }.get(gen, getattr(gen, "__name__", "unknown"))
+
+
+def _backend_hint(gen, cfg) -> str:
+    """Why this backend probably refused - the gate's message must be actionable."""
+    if gen is _gen_cloudflare:
+        missing = [k for k in ("CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN")
+                   if not os.environ.get(k, "").strip()]
+        if missing:
+            return f"{' / '.join(missing)} not set"
+        return "request refused (safety filter or model error - see the lines above)"
+    if gen is _gen_local:
+        try:
+            import diffusers  # noqa: F401
+            import torch  # noqa: F401
+        except ImportError:
+            return "torch/diffusers not installed (requirements-ai.txt)"
+        return "the pipeline ran and returned nothing"
+    if gen is _gen_pollinations:
+        return "throttled or refused (expected on the free anonymous tier)"
+    return "no image"
+
+
 def build_prompt(cfg, query: str) -> str:
     style = " ".join((cfg.get("visuals.style_prompt") or "").split())
     q = " ".join((query or "").split())
@@ -356,12 +426,15 @@ def _sanitise_prompt(prompt: str) -> str:
     return _framed(text)
 
 
-def _gen_cloudflare(cfg, prompt: str, seed: int, dest: Path) -> Path | None:
+def _gen_cloudflare(cfg, prompt: str, seed: int, dest: Path, steps: int | None = None) -> Path | None:
     """Free hosted images: Cloudflare Workers AI, flux-1-schnell.
 
     Workers Free gives 10,000 Neurons/day with no card. At roughly 45 Neurons an
     image that is ~200 images/day, so a 13-scene reel costs ~6% of the allowance.
     This is the backend that lets rendering run in CI, where there is no GPU.
+
+    `steps` overrides the configured count so a health probe can ask for the
+    cheapest possible image (one step) instead of a shippable one.
     """
     import base64
 
@@ -379,7 +452,9 @@ def _gen_cloudflare(cfg, prompt: str, seed: int, dest: Path) -> Path | None:
     # style prompt asks for a centred subject in a vertical composition.
     payload = {
         "prompt": prompt,
-        "steps": min(int(cfg.get("visuals.cf_steps", 4)), 8),  # flux-schnell caps at 8
+        "steps": min(
+            int(steps if steps is not None else cfg.get("visuals.cf_steps", 4)), 8
+        ),  # flux-schnell caps at 8
     }
     url = f"https://api.cloudflare.com/client/v4/accounts/{acct}/ai/run/{model}"
 
@@ -444,7 +519,12 @@ def _gen_cloudflare(cfg, prompt: str, seed: int, dest: Path) -> Path | None:
 
 
 def generate_image(cfg, query: str, seed: int, dest: Path) -> Path | None:
-    """Generate one illustration. Cached on disk by seed, so re-renders are free."""
+    """Generate one illustration into the caller's cache slot for this reel.
+
+    `dest` is named by `image_path(reel, image_seed(reel, query, index))`, so an
+    existing file is a rebuild of *this* reel and is reused. The cache never spans
+    reels: see `image_seed`.
+    """
     if dest.exists() and dest.stat().st_size > 5000:
         print(f"    [AI cache HIT] {dest.name} ({dest.stat().st_size:,} bytes)")
         return dest
@@ -454,24 +534,13 @@ def generate_image(cfg, query: str, seed: int, dest: Path) -> Path | None:
         dest.unlink()
     print(f"    [AI cache MISS] {dest.name}; requesting a new illustration")
     prompt = build_prompt(cfg, query)
-    backend = cfg.get("visuals.ai_backend", "local_sd")
-
-    # In CI there is no GPU and no model cache, so hosted is tried first.
-    order = {
-        "local_sd": [_gen_local, _gen_cloudflare, _gen_pollinations],
-                # No pollinations for the cloud backend: it is throttled to ~1 in 5
-        # and costs ~60s per image in retries before falling back, which
-        # reads as a frozen build.
-        "cloudflare": [_gen_cloudflare, _gen_local],
-        "pollinations": [_gen_pollinations, _gen_cloudflare, _gen_local],
-    }.get(backend, [_gen_local, _gen_cloudflare, _gen_pollinations])
 
     global _AI_QUOTA_EXHAUSTED
     if _AI_QUOTA_EXHAUSTED:
         print("    ! Cloudflare quota already exhausted in this run; skipping further AI requests")
         return None
 
-    for gen in order:
+    for gen in backend_order(cfg):
         try:
             img = gen(cfg, prompt, seed, dest)
         except AiQuotaExhausted as e:
@@ -495,7 +564,7 @@ def _local_files() -> list[Path]:
 
 # --------------------------------------------------------------------------- entry point
 def for_scene(cfg, store, index: int, seconds: float, query: str, out: Path,
-              used: set[str] | None = None) -> tuple[Path, str]:
+              used: set[str] | None = None, *, reel: str) -> tuple[Path, str]:
     provider = cfg.get("visuals.provider", "procedural")
     orientation = cfg.get("visuals.pexels_orientation", "portrait")
     used = used if used is not None else set()
@@ -503,18 +572,17 @@ def for_scene(cfg, store, index: int, seconds: float, query: str, out: Path,
     motion = MOTIONS[index % len(MOTIONS)] if animate else "in"
 
     if provider in ("ai_cartoon", "ai"):
-        # Seed from query + position: distinct image per scene even when two
-        # scenes share a visual_query, but stable across re-renders.
-        seed = int(hashlib.sha1(f"{query}|{index}".encode()).hexdigest()[:8], 16)
-        dest = _ai_cache() / f"{seed:08x}.jpg"
+        # Seed from reel + query + position: a distinct image per scene, stable
+        # across rebuilds of *this* reel, and never shared with another reel.
+        # `reel` is keyword-only and required so a new caller cannot silently
+        # reintroduce the channel-wide pool.
+        seed = image_seed(reel, query, index)
+        dest = image_path(reel, seed)
         if dest.exists() and dest.stat().st_size > 5000:
             img = dest
             visual_id = f"ai:{seed:08x}"
             print(f"    [AI cache HIT] {dest.name} ({dest.stat().st_size:,} bytes)")
         elif os.environ.get("AI_CACHE_ONLY", "").strip() == "1" or _AI_QUOTA_EXHAUSTED:
-            # On quota exhaustion, reuse a different cached illustration rather
-            # than failing the entire reel. If no cached image exists, procedural
-            # visuals keep the render moving without another paid/quota request.
             img = None
             visual_id = ""
         else:
@@ -522,17 +590,23 @@ def for_scene(cfg, store, index: int, seconds: float, query: str, out: Path,
             visual_id = f"ai:{seed:08x}" if img is not None else ""
 
         if img is None:
-            cached = [
-                p for p in sorted(_ai_cache().glob("*.jpg"))
-                if p != dest and p.is_file() and p.stat().st_size > 5000 and p.name not in used
+            # Quota gone, or nothing generated. Borrow from THIS REEL's earlier
+            # scenes only: `image_path` prefixes every file with the reel id, so
+            # the alternative - borrowing whatever is in the shared directory -
+            # would put another reel's pictures in this one, which is exactly the
+            # duplicate that made three reels look identical.
+            own = [
+                p for p in sorted(_ai_cache().glob(f"{reel}--*.jpg"))
+                if p != dest and p.is_file() and p.stat().st_size > 5000
+                and p.name not in used
             ]
-            if cached:
-                img = cached[index % len(cached)]
+            if own:
+                img = own[index % len(own)]
                 used.add(img.name)
                 visual_id = f"ai-cache-fallback:{img.stem}"
-                print(f"    [AI cache FALLBACK] {img.name} for uncached scene {dest.name}")
+                print(f"    [AI cache FALLBACK] {img.name} (same reel) for {dest.name}")
             else:
-                print(f"    [AI cache EMPTY] no reusable image for {dest.name}; using procedural")
+                print(f"    [AI cache EMPTY] no image from this reel for {dest.name}; using procedural")
 
         if img is not None:
             store.bump_visual(visual_id)
@@ -580,3 +654,48 @@ def for_scene(cfg, store, index: int, seconds: float, query: str, out: Path,
 
 def ffmpeg_available() -> bool:
     return shutil.which("ffmpeg") is not None and shutil.which("ffprobe") is not None
+
+
+PROBE_PROMPT = "a single plain grey circle"
+
+
+def probe(cfg, tmp: Path) -> list[tuple[str, bool, str]]:
+    """One real generation per backend, in the order a build would try them.
+
+    Returns [(name, ok, detail)]. Stops at the first success: the question this
+    answers is "can the next reel get images", not "is every optional provider
+    up". A backend that raises AiQuotaExhausted is reported as fatal and the
+    probe stops there - a fallback that has been tried and refused is still a
+    reason not to build.
+
+    Costs about 45 of Cloudflare's 10,000 daily neurons, and only when
+    Cloudflare is the backend in play.
+    """
+    results: list[tuple[str, bool, str]] = []
+    tmp.mkdir(parents=True, exist_ok=True)
+    dest = tmp / "health-image.jpg"
+    for gen in backend_order(cfg):
+        name = _backend_name(gen)
+        t = time.time()
+        try:
+            if gen is _gen_cloudflare:
+                img = gen(cfg, PROBE_PROMPT, 1, dest, steps=1)
+            else:
+                img = gen(cfg, PROBE_PROMPT, 1, dest)
+            took = time.time() - t
+        except AiQuotaExhausted as e:
+            reason = (str(e).splitlines() or ["allocation exhausted"])[0]
+            results.append((name, False, f"{reason} (fatal, no fallback)"))
+            break
+        except Exception as e:  # noqa: BLE001 - the message is the check
+            results.append((name, False, f"{type(e).__name__}: {str(e)[:120]}"))
+            continue
+        if img is not None and img.exists() and img.stat().st_size > 5000:
+            results.append((name, True, f"{img.stat().st_size // 1024} KB in {took:.1f}s"))
+            break
+        results.append((name, False, f"{_backend_hint(gen, cfg)} ({took:.1f}s)"))
+    try:
+        dest.unlink()
+    except OSError:
+        pass
+    return results

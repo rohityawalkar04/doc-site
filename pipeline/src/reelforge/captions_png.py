@@ -36,6 +36,11 @@ def _font_path(cfg) -> Path:
     raise RuntimeError(f"no caption font found in {cfg.path('assets/fonts')}")
 
 
+def font_path(cfg) -> Path:
+    """The font a render would use. Public so `health` checks the same file."""
+    return _font_path(cfg)
+
+
 def _colour(ass_style: str) -> tuple[int, int, int, int]:
     """'&HAABBGGRR' -> RGBA tuple."""
     h = ass_style.strip().lstrip("&H").lstrip("hH").zfill(8)

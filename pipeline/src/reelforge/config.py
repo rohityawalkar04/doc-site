@@ -61,8 +61,19 @@ def load() -> Config:
 
 
 def load_topics() -> list[dict]:
-    f = ROOT / "config" / "topics.yaml"
-    if not f.exists():
-        return []
-    data = yaml.safe_load(f.read_text()) or {}
-    return data.get("topics", []) or []
+    """Hand-written topics first, then the ones composed at runtime.
+
+    Two files, one order: `config/topics.yaml` is the curated queue and always
+    wins, `config/topics-generated.yaml` is the machine-owned append-only log of
+    what the channel published when that queue ran dry. They are separate files
+    because a YAML round-trip through a writer would strip the comments out of
+    the hand-curated one, and in this project those comments are the memory.
+    """
+    topics: list[dict] = []
+    for name in ("topics.yaml", "topics-generated.yaml"):
+        f = ROOT / "config" / name
+        if not f.exists():
+            continue
+        data = yaml.safe_load(f.read_text()) or {}
+        topics.extend(data.get("topics") or [])
+    return topics

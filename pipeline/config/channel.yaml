@@ -26,6 +26,11 @@ script:
   min_seconds: 45
   words_per_second: 2.9   # measured for en-US-AndrewNeural at rate +0%
   attempts: 2
+  # Runtime topics: when every topic in config/topics*.yaml is published, compose
+  # one from config/topic-bank.yaml rather than failing the run. 0 restores the
+  # old behaviour, where an empty queue is a failed run (and therefore a GitHub
+  # notification) instead of a green run that quietly published a composed reel.
+  max_generated_per_run: 1
 
 # ---- voice ----------------------------------------------------------------------
 # engine: edge  -> fastest to working, no key. Microsoft voices; not clearly

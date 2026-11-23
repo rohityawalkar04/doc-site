@@ -1,0 +1,289 @@
+# Runtime topic bank: what the channel publishes when the hand-written queue in
+# config/topics.yaml runs out.
+#
+# `reelforge.topics` composes one topic per night from this file: a theme gives
+# the subject and the nine steps, and the title, hook, tension, payoff and call
+# to action rotate with the UTC date. Two rules keep it honest:
+#   * every sentence here was written by a person - nothing is generated text;
+#   * it goes through the same gates as a hand-written beat sheet (llm._problems:
+#     no unverifiable numbers, no banned filler, 8-14 words per scene).
+#
+# Validate after every edit:
+#   PYTHONPATH=src .venv/bin/python -m reelforge.topics --check
+# See what it would publish tonight:
+#   PYTHONPATH=src .venv/bin/python -m reelforge.topics --next
+#
+# Numbers must be spelled out. `llm.STAT` blocks any digit followed by a time
+# unit ("2 minutes"), and a blocked sentence fails the whole composition.
+#
+# Each theme needs: id, angle, five titles, two hooks, two tensions, nine steps,
+# two payoffs, two ctas. Nine steps + four = the 13 scenes script.min_scenes asks
+# for. A theme is used when the rotation lands on it, so more themes means less
+# repetition.
+
+hashtags:
+  - "#shorts"
+  - "#discipline"
+  - "#motivation"
+  - "#mindset"
+  - "#selfimprovement"
+  - "#habits"
+  - "#focus"
+
+# Visual queries are shared across themes - a reel's images are already unique to
+# that reel (the cache is keyed by reel id), so variety here is about the shot,
+# not about avoiding a collision.
+visuals:
+  hook:
+    - "a closed door with warm light behind it"
+    - "a person standing at the edge of a pool"
+    - "a single empty chair beside a desk"
+    - "a staircase going up into soft shadow"
+    - "an unlit candle on a plain table"
+    - "a packed suitcase left beside a door"
+    - "a calendar with one empty square"
+    - "a figure seen from behind, looking out"
+  tension:
+    - "a knot in a length of plain rope"
+    - "a heavy stone at the top of a hill"
+    - "a window with rain running down it"
+    - "a stack of papers leaning sideways"
+    - "a door handle wrapped in cloth"
+    - "a figure carrying a wide box alone"
+    - "a bridge with one plank missing"
+    - "a clock with its hands near midnight"
+  step:
+    - "a hand opening a small notebook"
+    - "a hand setting a cup down on a desk"
+    - "a pencil drawing a single straight line"
+    - "a shoe placed at the edge of a path"
+    - "a small lamp switched on in a dark room"
+    - "a hand turning a page of a book"
+    - "a short ladder leaning against a wall"
+    - "a single key laid on a table"
+    - "a hand placing one block on top of another"
+    - "a footbridge over a narrow stream"
+    - "a hand writing a short note"
+    - "a kitchen timer on a plain counter"
+    - "a hand closing a laptop slowly"
+    - "a stamped envelope on a table"
+    - "a person standing up from a chair"
+    - "a hand pointing at a single word"
+    - "a small plant in a plain pot"
+    - "a hand holding an open door"
+  payoff:
+    - "a path opening into a wide field"
+    - "a lit lantern on a windowsill"
+    - "a hand releasing a small bird"
+    - "a road curving toward the horizon"
+    - "a cup of tea beside a finished page"
+    - "a door standing open in daylight"
+    - "a figure walking downhill, unhurried"
+    - "a single coin resting on an open palm"
+  cta:
+    - "a hand reaching for a door handle"
+    - "a pen held above a blank page"
+    - "a shoe stepping onto the first stair"
+    - "a finger pressing a small button"
+    - "a hand lifting a telephone"
+    - "a footprint in fresh snow"
+    - "a knob turned a quarter way"
+    - "a hand pushing a window open"
+
+themes:
+  - id: readiness
+    angle: >-
+      Readiness is a result of motion, not a prerequisite for it. The feeling is
+      real, it just arrives second, and waiting for it first is the whole delay.
+    hashtags:
+      - "#procrastination"
+      - "#starting"
+      - "#discipline"
+      - "#mindset"
+      - "#motivation"
+    titles:
+      - "You are waiting to feel ready"
+      - "Readiness arrives after the first attempt"
+      - "The mood is not a precondition"
+      - "Waiting for certainty is the delay"
+      - "You will feel ready once it is already moving"
+    hooks:
+      - "You are not waiting for time, you are waiting for a feeling"
+      - "The plan is finished, and you are still waiting to feel ready"
+    tensions:
+      - "That feeling never arrives before the work, only after it"
+      - "Rehearsal feels like progress, and it makes the first step heavier"
+    steps:
+      - "Name the smallest version of the thing you can finish tonight"
+      - "Start it badly, on purpose, with no plan to fix it"
+      - "Set a timer for two minutes and stop when it rings"
+      - "Do the ugliest part first, while nobody is watching"
+      - "Write the next physical action, not the goal"
+      - "Leave the work open when you stop, so restarting stays cheap"
+      - "Repeat it tomorrow at the same hour, whatever the mood says"
+      - "Cut the warm-up ritual down to one thing you cannot skip"
+      - "Tell one person you started, and let them ask about it"
+    payoffs:
+      - "The feeling you wanted was on the other side of the first attempt"
+      - "Readiness stops being a gate and becomes a side effect"
+    ctas:
+      - "Pick the smallest version now, before you think about it again"
+      - "Start badly tonight, and let tomorrow be the good one"
+
+  - id: permission
+    angle: >-
+      Nobody is coming to appoint you. The qualification people wait for is
+      usually issued by the work itself, after the work, and the wait is the only
+      thing that separates the two.
+    hashtags:
+      - "#confidence"
+      - "#starting"
+      - "#career"
+      - "#mindset"
+      - "#discipline"
+    titles:
+      - "Nobody is coming to give you permission"
+      - "You are waiting to be chosen"
+      - "The credential is not the gate"
+      - "You do not need to be picked"
+      - "Permission is a story about other people"
+    hooks:
+      - "You are waiting for someone to say you are allowed to begin"
+      - "Somebody qualified could tell you to start, and they have not"
+    tensions:
+      - "The gate is not the missing title, it is the waiting"
+      - "Being chosen feels safer than choosing, and it costs the year"
+    steps:
+      - "Write down what you would do if a senior person told you to"
+      - "Build the first version without announcing what it is"
+      - "Answer the question you keep asking other people"
+      - "Put one piece of the work where a stranger can find it"
+      - "Replace whether you may with what you will try"
+      - "Find someone doing it badly and note what they got away with"
+      - "Give yourself the deadline nobody else is going to set"
+      - "Ask for the job instead of the blessing"
+      - "Repeat until being unchosen stops changing your next hour"
+    payoffs:
+      - "Nobody was going to hand it over, and that was the good news"
+      - "Permission is something you backdate, not something you receive"
+    ctas:
+      - "Decide who you are waiting for, then write their answer yourself"
+      - "Start tonight, and let the title catch up later"
+
+  - id: restart
+    angle: >-
+      The break is rarely what ends a habit. The tax afterwards is: restarting at
+      the old intensity, then treating the failure to match it as evidence.
+    hashtags:
+      - "#habits"
+      - "#consistency"
+      - "#restart"
+      - "#discipline"
+      - "#mindset"
+    titles:
+      - "The gap is not what undid you"
+      - "Starting again is cheaper than you think"
+      - "You are paying a tax on the weeks you missed"
+      - "The break was fine, the story about it is not"
+      - "You are avoiding the restart, not the work"
+    hooks:
+      - "You missed three weeks and now the work feels like a punishment"
+      - "The break was reasonable, and the guilt afterwards is the damage"
+    tensions:
+      - "You restart at the intensity you left, and that is why you stall"
+      - "The missed weeks are gone, and you are still paying interest"
+    steps:
+      - "Write down the honest restart size, smaller than you want"
+      - "Do one session at half the length and call it a win"
+      - "Skip the catch-up entirely, because it is the trap"
+      - "Open the work for ten minutes before judging anything"
+      - "Tell nobody about the restart until the third session"
+      - "Put the restart in the calendar as a small, boring appointment"
+      - "Lower the standard for this week only, in writing"
+      - "Notice the story about lost time and write it down"
+      - "Choose the pace you can hold on your worst week"
+    payoffs:
+      - "The break stops being a debt the moment you restart small"
+      - "Consistency is easier to rebuild than to maintain, once you begin"
+    ctas:
+      - "Put one small session in tomorrow, before you close this"
+      - "Restart at half size tonight, and keep the habit, not the streak"
+
+  - id: feedback
+    angle: >-
+      Hiding the work protects your estimate of it, not the work. The version
+      nobody sees cannot be corrected, and the fear is usually of discovering a
+      guess rather than of being judged.
+    hashtags:
+      - "#creativity"
+      - "#feedback"
+      - "#shipping"
+      - "#mindset"
+      - "#discipline"
+    titles:
+      - "You are hiding the work until it is safe"
+      - "Nobody is watching as closely as you hope"
+      - "The first version is not a verdict"
+      - "You are protecting the work from the wrong thing"
+      - "Feedback is cheaper than another silent month"
+    hooks:
+      - "You keep the work hidden until it is good enough to defend"
+      - "You are protecting it from criticism, and from anyone helping"
+    tensions:
+      - "Waiting to be safe means nobody sees it, nobody corrects it"
+      - "The fear is not judgement, it is finding out you guessed"
+    steps:
+      - "Show one person the rough version and ask one question"
+      - "Name what you want feedback on, or you will get something else"
+      - "Send it before the second edit, not after the fifth"
+      - "Write the criticism you fear, then test whether it is true"
+      - "Collect three reactions and look for the repeat"
+      - "Fix one thing per round, not everything at once"
+      - "Keep a list of what people ignore, it is data"
+      - "Publish the version you would defend in one sentence"
+      - "Ask the person who will still be there next year"
+    payoffs:
+      - "The work gets better in public, not in the drawer"
+      - "Being seen badly once beats being seen nowhere for a year"
+    ctas:
+      - "Send one rough thing to one person before the week ends"
+      - "Show it now, while changing it is still easy"
+
+  - id: asking
+    angle: >-
+      A guess is not free, it is a loan against your own time. The awkward moment
+      of asking is short, and the wrong assumption it avoids can last a month.
+    hashtags:
+      - "#communication"
+      - "#work"
+      - "#confidence"
+      - "#mindset"
+      - "#discipline"
+    titles:
+      - "You would rather guess than ask"
+      - "Guessing feels cheaper than asking, and it is not"
+      - "The question you are avoiding has a person attached"
+      - "You are paying for a five minute answer in days"
+      - "Asking is the fastest edit you have"
+    hooks:
+      - "You spent the week guessing, and one message would have settled it"
+      - "The question is small, and the cost of not asking is not"
+    tensions:
+      - "The awkwardness lasts a moment and the wrong guess lasts a month"
+      - "You protect your image by paying in hours you cannot bill"
+    steps:
+      - "Write the question as one sentence with the decision attached"
+      - "Name the two options you are choosing between out loud"
+      - "Send it early in the day, when people are still generous"
+      - "Say what you already tried, so the answer is cheap to give"
+      - "Ask the person with the least to gain from flattering you"
+      - "Set a time after which you stop waiting and choose"
+      - "Write down the answer before you act, while it is fresh"
+      - "Thank them in one line and tell them what you did"
+      - "Keep a list of the questions you were afraid to ask"
+    payoffs:
+      - "The answer was always going to cost less than the guessing"
+      - "Asking gets faster each time, and the shame gets smaller"
+    ctas:
+      - "Send the question you have been drafting for a week"
+      - "Ask today, and stop paying for silence with your time"

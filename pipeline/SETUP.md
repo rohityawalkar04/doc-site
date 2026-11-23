@@ -206,6 +206,7 @@ Quota: one upload costs 1,600 of the 10,000 daily units → **~6 uploads/day**.
 cd ~/Documents/reelforge
 .venv/bin/python scripts/set_env.py show   # masked values, safe to screenshot
 ./reelforge doctor                         # pass/fail per requirement
+./reelforge health                         # same, but each model is actually called
 ```
 
 Everything under `publish` should read **OK**.

@@ -28,6 +28,7 @@ config/channel.yaml ─┘                 │
 ./scripts/setup.sh          # venv + editable install
 cp .env.example .env        # fill in later, stage by stage
 reelforge doctor            # what works, what is missing
+reelforge health            # call every model once, then decide
 reelforge plan              # print the next script, render nothing
 reelforge render --count 1  # build a reel
 reelforge list              # recent reels + where they were published
@@ -78,6 +79,32 @@ publish.youtube.privacy    # public | unlisted | private
 (tracked in `work/reelforge.db`). Add topics; the `beats` list is the offline
 fallback and is used verbatim, so write it well.
 
+### When the queue runs out
+
+The channel does not stop when `topics.yaml` is exhausted. `config/topic-bank.yaml`
+is a second, machine-composed source: five themes (readiness, permission,
+restart, feedback, asking), each given a subject and nine ordered steps, with the
+title, hook, tension, payoff and call to action rotating by UTC date. The composed
+topic is appended to `config/topics-generated.yaml` and committed by
+`scripts/record_ledger.sh` in the same push as the ledger — so the channel stays
+auditable, and a composed reel that was wrong can be edited afterwards.
+
+Three things it will not do: invent text (every sentence in the bank is written by
+a person), skip the script gates (it runs `llm._problems`, the same unverifiable-
+number and banned-phrase checks a hand-written beat sheet faces), or repeat a
+title (it is checked against every topic file and the ledger before a single
+image is generated).
+
+```bash
+./reelforge topics --check   # validate the bank after editing it
+./reelforge topics --next    # what it would publish tonight, and how long it runs
+```
+
+Set `script.max_generated_per_run: 0` (or pass `--no-generate`) to go back to
+failing the run when the queue is empty — a red run is the reminder that the
+written queue needs feeding. The bank is finite: 25 titles today, and when they
+are used it fails loudly and names the file to extend.
+
 ## Visual providers
 
 | provider | needs | when |
@@ -99,8 +126,12 @@ on it: measured in Nov 2026, `model=flux` returns HTTP 402 and `model=sana` is
 throttled such that **1 of 5 requests succeeded**, each failure taking ~40 s.
 It is wired as a secondary attempt, not the default.
 
-Every illustration is cached in `assets/cache/ai/<seed>.jpg`, so re-rendering a
-reel costs no generation time.
+Every illustration is cached in `assets/cache/ai/<reel>--<seed>.jpg`, where the
+seed is a hash of **(reel id, visual_query, scene index)**. Re-rendering the same
+reel costs no generation time, and no two reels can share a picture: without the
+reel id in the key the cache was a channel-wide pool, and the quota fallback then
+filled stalled scenes with any image it found — which is how three reels built in
+one sitting shipped the same pictures.
 
 In GitHub Actions, this directory is restored from and saved to the repository's
 Actions cache (it is intentionally git-ignored, not committed to the source repo).
@@ -108,6 +139,8 @@ The workflow reports the restored image count and size before rendering, and the
 renderer logs an explicit `AI cache HIT` or `AI cache MISS` for each scene.
 A cache hit reuses the original image without calling Cloudflare Workers AI; a
 new topic/visual query still needs one fresh image generation the first time.
+When the quota runs out mid-reel, a scene may borrow an image from **the same
+reel's** earlier scenes (logged `AI cache FALLBACK`) and never from another one.
 
 ### Animation
 
@@ -350,14 +383,27 @@ card, no machine at home.
   Write them in batches; that part is still yours.
 - **No sqlite** — the runner is wiped each time, so "what has been published"
   lives in `state/published.json`, committed back by the workflow.
-- **Image cache, keyed per run** — scene images are named by a hash of
-  (visual_query, scene index), so a scene that was rendered once is free to
-  rebuild. The workflow restores the newest `ai-` snapshot and always writes a
-  new one, including on a failed run, so a retry resumes instead of paying
-  ~580 Neurons again. (The key used to be the topics.yaml hash alone, constant
-  for weeks: actions/cache skips the save on an exact hit, so new scenes were
-  generated and never stored. That is what exhausted the daily budget on
-  17-18 Nov.)
+- **Image cache, keyed per reel** — scene images are named by a hash of
+  (reel id, visual_query, scene index), so a scene that was rendered once is free
+  to rebuild *for that reel* and cannot be reused by another one. The workflow
+  restores the newest `ai-` snapshot and always writes a new one, including on a
+  failed run, so a retry resumes instead of paying ~580 Neurons again. (The key
+  used to be the topics.yaml hash alone, constant for weeks: actions/cache skips
+  the save on an exact hit, so new scenes were generated and never stored. That
+  is what exhausted the daily budget on 17-18 Nov. The key then became
+  (visual_query, scene index) alone, which fixed the budget and quietly made the
+  cache a channel-wide pool — with quota-fallback borrowing on top, three reels
+  built in one sitting shipped the same pictures. The reel id closes both.)
+- **A live gate before the first scene** — `scripts/cloud_run.py` calls
+  `reelforge.health` before building: one real request per model and resource
+  (Cloudflare image, TTS engine, ffmpeg encode, font, music bed, disk, and the
+  topic source), about ten seconds and ~45 neurons. A quota-exhausted backend or
+  a throttled voice endpoint fails the run immediately instead of at scene 9 of
+  13. `reelforge doctor` still answers the cheaper question: is it installed.
+- **Runtime topics** — when the written queue is empty, one topic is composed
+  from `config/topic-bank.yaml` and appended to `config/topics-generated.yaml`,
+  which the ledger push commits. The build then treats it like any other topic;
+  nothing downstream knows or cares where the words came from.
 
 ### The catch that matters
 

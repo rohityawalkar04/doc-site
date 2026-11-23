@@ -15,7 +15,6 @@ waiting on a network, the other is CPU-bound.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import subprocess
 import sys
 import time
@@ -29,6 +28,7 @@ import os  # noqa: E402
 os.environ.setdefault("REELFORGE_ROOT", str(ROOT))  # so image cache paths match the render subprocess
 
 from reelforge import config, llm, visuals  # noqa: E402
+from reelforge.pipeline import slug  # noqa: E402
 
 
 def plan(cfg, topic: dict) -> dict:
@@ -46,9 +46,10 @@ def phases(plans, cfg, jobs: int) -> int:
     cache = visuals._ai_cache()
     made = failed = hit = 0
     for p in plans:
+        reel = slug(p["topic"]["title"])
         for i, scene in enumerate(p["script"]["scenes"]):
             query = scene["visual_query"]
-            seed = int(hashlib.sha1(f"{query}|{i}".encode()).hexdigest()[:8], 16)
+            seed = visuals.image_seed(reel, query, i)
             dest = cache / f"{seed:08x}.jpg"
             existed = dest.exists() and dest.stat().st_size > 5000
             t = time.time()

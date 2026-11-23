@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 os.environ.setdefault("REELFORGE_ROOT", str(ROOT))
 
-from reelforge import config, ledger, pipeline, state  # noqa: E402
+from reelforge import config, health, ledger, pipeline, state, topics as topics_mod  # noqa: E402
 from reelforge.visuals import AiQuotaExhausted  # noqa: E402
 
 # CI captures stdout, so Python block-buffers it and progress appears in
@@ -130,6 +130,14 @@ def main() -> int:
                     help="commit and push the ledger after every upload, and stop the "
                          "batch if that push fails (CI: one lost push = one duplicate, "
                          "not a night's worth)")
+    ap.add_argument("--skip-health", action="store_true",
+                    help="skip the live model/resource probe before building. Only for "
+                         "an emergency re-run when a probe is wrong: a build whose "
+                         "health failed costs a whole run, not ten seconds")
+    ap.add_argument("--no-generate", action="store_true",
+                    help="when the queue is empty, fail the run instead of composing a "
+                         "topic from config/topic-bank.yaml. Use this when you want the "
+                         "red run as the reminder that the queue needs writing")
     args = ap.parse_args()
 
     if args.dry_run:
@@ -168,6 +176,24 @@ def main() -> int:
             return 1
         print("preflight: Cloudflare Workers AI configured")
 
+    # Live gate: one real request per model, before the first scene. `doctor`
+    # answers "is it installed"; this answers "does it answer". A backend that is
+    # out of allocation, or a voice endpoint throttling this IP, now fails in ten
+    # seconds instead of at scene 9 of 13 after forty minutes - and before the
+    # day's neurons are spent finding out.
+    if not args.skip_health:
+        checks = health.check(cfg)
+        if not health.report(checks):
+            first = next((c for c in checks if not c.ok), None)
+            print("::error title=Health check failed::"
+                  f"{first.group}/{first.label}: {first.detail}")
+            print("Refusing to build. Fix the resource, or re-run with --skip-health "
+                  "if the probe itself is wrong.")
+            return 1
+        print("preflight: every model and resource answered")
+    else:
+        print("preflight: health check SKIPPED (--skip-health)")
+
     # GitHub's schedule event is best-effort and can drop a run under load, so
     # the workflow fires more than once a day. This guard makes the retries free:
     # the first success stamps the date and the rest become no-ops. A rehearsal
@@ -182,12 +208,34 @@ def main() -> int:
     done = ledger.load()
     topics = [t for t in config.load_topics() if str(t["id"]) not in done]
     if not topics:
-        # Deliberately a failure, not a warning: an unattended channel that has
-        # stopped posting is broken, and GitHub only notifies on failed runs. A
-        # green run with a warning would go unread for weeks.
-        print("::error title=Out of topics::every topic in config/topics.yaml has "
-              "been published - add more beats, or the channel stops here")
-        return 1
+        # The queue is empty: compose one from config/topic-bank.yaml instead of
+        # stopping. The old behaviour - a red run with "add more beats" - was the
+        # only reminder that the channel was about to go quiet, so `--no-generate`
+        # and `script.max_generated_per_run: 0` restore it.
+        allowed = int(cfg.get("script.max_generated_per_run", 1))
+        if args.no_generate or allowed <= 0:
+            # Deliberately a failure, not a warning: an unattended channel that has
+            # stopped posting is broken, and GitHub only notifies on failed runs.
+            print("::error title=Out of topics::every topic in config/topics.yaml has "
+                  "been published - add more beats, or allow runtime topics")
+            return 1
+        # `--count 0` means "drain"; with an empty queue that is the cap. A manual
+        # `--count 2` asks for two, so it composes at most two. Each composition
+        # avoids the ones before it, because nothing is in the ledger until a reel
+        # actually publishes.
+        want = allowed if args.count == 0 else min(allowed, args.count)
+        topics = []
+        for _ in range(want):
+            try:
+                composed = topics_mod.generate(
+                    cfg, avoid={str(t["title"]) for t in topics}
+                )
+            except SystemExit as e:
+                print(f"::error title=Cannot compose a topic::{str(e).splitlines()[0][:300]}")
+                print(e)
+                return 1
+            print(f"queue empty -> composed {composed['id']!r} from config/topic-bank.yaml")
+            topics.append(composed)
 
     store = state.Store(cfg.db)
     # count 0 means "work through the whole queue": the loop stops on its own at
@@ -235,6 +283,26 @@ def main() -> int:
             left = len(topics) - topics.index(topic)
             print(f"\nSTOPPED after {len(ledger.load())} published. {left} reel(s) still queued.")
             return 1
+
+        # A topic composed at runtime is written to config/topics-generated.yaml
+        # here - after the upload landed, before the ledger push - so one commit
+        # carries both the record and the thing it recorded. Doing it before the
+        # upload would leave a topic the channel never saw.
+        if topic.get("_generated"):
+            saved = topics_mod.save_generated(cfg, topic)
+            print(f"  recorded the composed topic in {saved.name}", flush=True)
+            # The one case where the platform already had this title: a composed
+            # title collided with a video the local files do not know about. The
+            # video is live, so the ledger entry is the truth, not a guess - and
+            # without it check_channel reports the channel as drift and next
+            # night's rotation rebuilds the same skipped title.
+            live_skip = any(
+                isinstance(r, dict) and r.get("live_title") for r in result.values()
+            )
+            if live_skip and not ledger.is_published(str(topic["id"])):
+                ledger.add(str(topic["id"]), title=topic["title"])
+                print("  channel already had this title - recorded it so the "
+                      "rotation moves on", flush=True)
 
         # Record this reel before building the next one. The 16-17 Nov jobs uploaded
         # six reels and pushed the ledger once, at the end; that push failed on a

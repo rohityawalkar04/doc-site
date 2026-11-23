@@ -22,6 +22,14 @@ import requests
 RETRIES = 6
 SCENE_GAP = 0.45  # the endpoint rate-limits hard; a small gap is cheaper than a retry
 ATTEMPT_TIMEOUT = 70  # seconds; a hung request must never block the reel
+PROBE_TIMEOUT = 20  # seconds; a health probe is meant to answer, not to try hard
+PROBE_ATTEMPTS = 3  # the endpoint refuses single requests; the build retries 6 times
+
+
+async def _bounded_edge(text: str, voice_name: str, rate: str, pitch: str, out: Path) -> None:
+    await asyncio.wait_for(
+        _edge_once(text, voice_name, rate, pitch, out), timeout=PROBE_TIMEOUT
+    )
 
 
 async def _edge_once(text: str, voice: str, rate: str, pitch: str, out_path: Path) -> list[dict]:
@@ -201,3 +209,53 @@ def duration(path: str | Path) -> float:
     if res.returncode != 0:
         raise RuntimeError(f"ffprobe failed on {path}: {res.stderr.strip()}")
     return float(res.stdout.strip())
+
+
+def probe(cfg, tmp: Path) -> tuple[str, bool, str]:
+    """Synthesise one short phrase with the configured engine. (engine, ok, detail)
+
+    A presence check cannot tell you that edge-tts is throttling this IP, or that
+    a piper download stopped halfway. One real sentence can, in about a second.
+    Three attempts for edge-tts: it refuses single requests for transient
+    reasons, and one refusal is not evidence that a whole run would fail.
+    """
+    engine = str(cfg.get("voice.engine", "edge")).lower()
+    tmp.mkdir(parents=True, exist_ok=True)
+    text = "Health check."
+    t = time.time()
+
+    if engine == "piper":
+        model = ensure_piper_model(cfg)
+        out = tmp / "probe-piper.wav"
+        _piper_scene(text, model, out)
+        return "piper", True, f"{model.name} -> {out.stat().st_size // 1024} KB in {time.time() - t:.1f}s"
+
+    if engine == "kokoro":
+        out = tmp / "probe-kokoro"
+        _kokoro_scene(text, cfg.get("voice.kokoro_voice", "af_heart"), out)
+        wav = out.with_suffix(".wav")
+        return "kokoro", True, f"{wav.stat().st_size // 1024} KB in {time.time() - t:.1f}s"
+
+    name = cfg.get("voice.name", "en-US-AndrewNeural")
+    rate = cfg.get("voice.rate", "+0%")
+    pitch = cfg.get("voice.pitch", "+0Hz")
+    out = tmp / "probe-edge.mp3"
+    out.unlink(missing_ok=True)
+    last = "no attempt ran"
+    # The endpoint rate-limits hard: the same request that is refused twice
+    # usually succeeds on the next try, so a one-shot probe reports a healthy
+    # engine as broken and blocks a build that would have worked. Three tries
+    # with a short backoff, against the build's own six.
+    for attempt in range(PROBE_ATTEMPTS):
+        try:
+            asyncio.run(_bounded_edge(text, name, rate, pitch, out))
+            if out.exists() and out.stat().st_size > 2000:
+                return "edge", True, f"{name} -> {out.stat().st_size // 1024} KB in {time.time() - t:.1f}s"
+            last = "audio arrived but was empty"
+        except Exception as e:  # noqa: BLE001 - the message is the check
+            last = type(e).__name__ if not str(e) else f"{type(e).__name__}: {str(e)[:100]}"
+        if attempt < PROBE_ATTEMPTS - 1:
+            time.sleep(1.0 * (attempt + 1))
+    return ("edge", False,
+            f"{last} ({PROBE_ATTEMPTS} attempts in {time.time() - t:.0f}s; the build "
+            f"itself retries {RETRIES} times, so this can still be a refusal)")
