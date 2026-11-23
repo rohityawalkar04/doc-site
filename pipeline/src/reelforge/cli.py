@@ -152,15 +152,17 @@ def cmd_plan(args) -> int:
 
 
 # --------------------------------------------------------------------------- render
-def _topic_by_id(topic_id: str) -> dict:
-    for t in config.load_topics():
+def _topic_by_id(topic_id: str, fmt: str = "reel") -> dict:
+    for t in config.load_topics(fmt):
         if str(t["id"]) == topic_id:
             return t
-    raise SystemExit(f"no topic with id {topic_id!r} in config/topics.yaml")
+    raise SystemExit(f"no topic with id {topic_id!r} in config/topics-{fmt}.yaml")
 
 
 def cmd_render(args) -> int:
     cfg = _boot()
+    fmt = getattr(args, "format", "reel") or "reel"
+    cfg.apply_format(fmt)
     if getattr(args, "provider", None):
         cfg.override("visuals.provider", args.provider)
         print(f"  provider override -> {args.provider}")
@@ -168,7 +170,7 @@ def cmd_render(args) -> int:
         cfg.override("script.mode", "beats")
     store = state.Store(cfg.db)
     for n in range(args.count):
-        topic = _topic_by_id(args.topic) if args.topic else pipeline.next_topic(cfg, store)
+        topic = _topic_by_id(args.topic, fmt) if args.topic else pipeline.next_topic(cfg, store, fmt)
         try:
             pipeline.build(cfg, store, topic, keep_work=not args.clean)
         except Exception as e:
@@ -295,6 +297,8 @@ def cmd_publish(args) -> int:
 # --------------------------------------------------------------------------- run
 def cmd_run(args) -> int:
     cfg = _boot()
+    fmt = getattr(args, "format", "reel") or "reel"
+    cfg.apply_format(fmt)
     if getattr(args, "provider", None):
         cfg.override("visuals.provider", args.provider)
     if not getattr(args, "skip_health", False):
@@ -306,7 +310,7 @@ def cmd_run(args) -> int:
     store = state.Store(cfg.db)
     built: list[str] = []
     for _ in range(args.count):
-        topic = pipeline.next_topic(cfg, store)
+        topic = pipeline.next_topic(cfg, store, fmt)
         meta = pipeline.build(cfg, store, topic, keep_work=not args.clean)
         built.append(meta["reel_id"])
     if args.publish:
@@ -344,6 +348,7 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--topic", help="render one specific topic id")
     r.add_argument("--from-beats", action="store_true", help="skip the LLM, use beats")
     r.add_argument("--provider", help="procedural | ai_cartoon | pexels | local")
+    r.add_argument("--format", default="reel", help="reel | video")
     r.add_argument("--clean", action="store_true", help="delete per-reel work dir")
     r.add_argument("--stop-on-error", action="store_true")
     r.set_defaults(fn=cmd_render)
@@ -372,6 +377,7 @@ def main(argv: list[str] | None = None) -> int:
     rn = sub.add_parser("run", help="render and optionally publish (cron entry point)")
     rn.add_argument("--count", type=int, default=1)
     rn.add_argument("--provider", help="procedural | ai_cartoon | pexels | local")
+    rn.add_argument("--format", default="reel", help="reel | video")
     rn.add_argument("--publish", action="store_true")
     rn.add_argument("--clean", action="store_true")
     rn.add_argument("--skip-health", action="store_true",

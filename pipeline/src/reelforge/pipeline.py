@@ -6,7 +6,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import captions, captions_png, config, ledger, llm, render, state, visuals, voice
+from . import captions, captions_png, captions_srt, config, ledger, llm, render, state, visuals, voice
 from .text import slug  # noqa: F401 - re-exported: callers import pipeline.slug
 
 
@@ -16,9 +16,9 @@ def log(msg: str) -> None:
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
 
 
-def next_topic(cfg, store: state.Store) -> dict:
+def next_topic(cfg, store: state.Store, fmt: str = "reel") -> dict:
     """The next thing to publish: the curated queue, then a composed topic."""
-    topics = config.load_topics()
+    topics = config.load_topics(fmt)
     for t in topics:
         # topics_used is this machine's history; the ledger is everyone's. A fresh
         # clone has an empty sqlite but a truthful ledger, so skipping on both is
@@ -26,6 +26,10 @@ def next_topic(cfg, store: state.Store) -> dict:
         if store.topic_used(str(t["id"])) or ledger.is_published(str(t["id"])):
             continue
         return t
+    if fmt != "reel":
+        raise SystemExit(
+            f"all topics in config/topics-{fmt}.yaml are used - add more"
+        )
     # Nothing left in the queue. Composing one here rather than failing is the
     # difference between a channel that pauses and one that stops.
     from . import topics as topics_mod
@@ -50,6 +54,7 @@ def build(cfg, store: state.Store, topic: dict, keep_work: bool = True) -> dict:
     meta = {
         "reel_id": reel_id,
         "topic_id": topic["id"],
+        "format": cfg.get("format", "reel"),
         "script_source": source,
         "fallback_reason": script.get("_fallback_reason"),
         "advisory": script.get("_advisory"),
@@ -105,15 +110,20 @@ def build(cfg, store: state.Store, topic: dict, keep_work: bool = True) -> dict:
     log("5/6 captions")
     t = time.time()
     captions_obj = None
+    subtitles = None
     if cfg.get("captions.enabled", True):
         mode = cfg.get("captions.mode", "auto")
-        use_ass = mode == "ass" or (mode == "auto" and render.has_filter("ass"))
-        if use_ass:
-            captions_obj = captions.build(cfg, scenes, work / "captions.ass")
-            print("      mode=ass (libass available, per-word karaoke)")
+        if mode == "srt":
+            subtitles = captions_srt.build(cfg, scenes, work / "captions.srt")
+            print(f"      mode=srt (soft track, {subtitles.stat().st_size} bytes)")
         else:
-            captions_obj = captions_png.render(cfg, scenes, work / "caps")
-            print(f"      mode=png ({len(captions_obj)} caption cards)")
+            use_ass = mode == "ass" or (mode == "auto" and render.has_filter("ass"))
+            if use_ass:
+                captions_obj = captions.build(cfg, scenes, work / "captions.ass")
+                print("      mode=ass (libass available, per-word karaoke)")
+            else:
+                captions_obj = captions_png.render(cfg, scenes, work / "caps")
+                print(f"      mode=png ({len(captions_obj)} caption cards)")
     log(f"    done in {time.time() - t:.1f}s")
 
     log("6/6 final render")
@@ -121,7 +131,16 @@ def build(cfg, store: state.Store, topic: dict, keep_work: bool = True) -> dict:
     music = render.find_music(cfg) or render.ensure_music_bed(work)
     out = cfg.out / f"{reel_id}.mp4"
     out.parent.mkdir(parents=True, exist_ok=True)
-    render.final(video_track, voice_track, captions_obj, music, out, cfg, total)
+    render.final(video_track, voice_track, captions_obj, music, out, cfg, total,
+                 subtitles=subtitles)
+
+    if cfg.get("publish.thumbnail", False):
+        # Long-form needs a 16:9 thumbnail; a Short does not. Taken from the
+        # reel's own first frame so the thumbnail cannot misrepresent the video.
+        frame = render.frame_from(video_parts[0], work / "thumb_frame.jpg", at=1.0)
+        thumb = render.thumbnail(cfg, frame, cfg.out / f"{reel_id}.jpg", script["title"])
+        meta["thumbnail"] = str(thumb)
+        print(f"      thumbnail -> {thumb.name}")
 
     meta["duration"] = render.probe_duration(out)
     meta["video_path"] = str(out)

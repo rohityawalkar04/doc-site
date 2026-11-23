@@ -32,6 +32,35 @@ script:
   # notification) instead of a green run that quietly published a composed reel.
   max_generated_per_run: 1
 
+# ---- formats ---------------------------------------------------------------------
+# Two builds share one pipeline. A format is only the difference that matters:
+# aspect, script length, caption kind, and whether a thumbnail is published.
+# `reel` reproduces the original vertical Short exactly; `video` is the landscape
+# long-form build with its own workflow and its own topic queue.
+formats:
+  reel:
+    visuals: {width: 1080, height: 1920}
+    script: {min_scenes: 13, max_scenes: 14, target_seconds: 50, min_seconds: 45}
+    captions: {mode: auto}          # ass karaoke if libass exists, else PNG cards
+    publish: {thumbnail: false}
+  video:
+    visuals:
+      width: 1920
+      height: 1080
+      # Longer shots: a 1.6x zoom over a three-second scene is busy; the same rate
+      # held for eight seconds drifts. Slower reads as deliberate at this length.
+      zoom_rate: 0.0009
+    script:
+      min_scenes: 30
+      max_scenes: 34
+      target_seconds: 170
+      min_seconds: 140
+    captions:
+      mode: srt                       # soft track: cheap, indexable, switchable
+      srt_chars: 84
+    publish:
+      thumbnail: true                 # 16:9 thumbnail, set on upload
+
 # ---- voice ----------------------------------------------------------------------
 # engine: edge  -> fastest to working, no key. Microsoft voices; not clearly
 #                  licensed for commercial reuse. Fine for testing.

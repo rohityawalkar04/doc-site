@@ -31,6 +31,7 @@ reelforge doctor            # what works, what is missing
 reelforge health            # call every model once, then decide
 reelforge plan              # print the next script, render nothing
 reelforge render --count 1  # build a reel
+reelforge render --format video --count 1   # build a landscape long-form video
 reelforge list              # recent reels + where they were published
 open out/*.mp4
 ```
@@ -104,6 +105,39 @@ Set `script.max_generated_per_run: 0` (or pass `--no-generate`) to go back to
 failing the run when the queue is empty — a red run is the reminder that the
 written queue needs feeding. The bank is finite: 25 titles today, and when they
 are used it fails loudly and names the file to extend.
+
+## Formats
+
+One pipeline, two builds. A format is only the difference that matters — aspect,
+script length, caption kind, whether a thumbnail is published — and it is data in
+`config/channel.yaml` under `formats:`:
+
+| | `reel` | `video` |
+|---|---|---|
+| shape | 1080×1920, ~50 s | **1920×1080, ~2.5 min** |
+| scenes | 13 | 34–40 |
+| captions | per-phrase PNG cards / ASS karaoke | **soft SRT track** (indexable, free) |
+| queue | `config/topics.yaml` + composed bank | **`config/topics-video.yaml`** |
+| thumbnail | none | **1280×720, set on upload** |
+| workflow | `reel.yml` (19:07 IST) | **`video.yml` (08:37 IST)** |
+
+Long-form does not reuse the reel's PNG caption cards: a few hundred Pillow cards
+cost minutes of render for something that looks worse than a subtitle track, and
+YouTube indexes an SRT as your captions. It also does not reuse the composed topic
+bank — three 13-beat shorts stapled together is reused content, not a long-form
+script — so a video queue is written by hand and the build refuses `--format video`
+with an empty queue rather than composing one.
+
+Both builds share the ledger, the sqlite store, the image cache and the publish
+path; `--once-per-day` is scoped per format, so the morning video does not make
+the evening reel skip. YouTube's 1,600 quota units per upload still cap a project
+at ~6 uploads/day, which is what actually limits how many channels you run.
+
+```bash
+./reelforge render --format video --count 1      # build one, locally
+./reelforge run --format video --count 1 --publish
+gh workflow run video.yml -R <owner>/<repo> -f mode=dry-run
+```
 
 ## Visual providers
 

@@ -94,8 +94,8 @@ def has_filter(name: str) -> bool:
 
 
 def final(video: Path, voice: Path, captions, music: Path | None,
-          out: Path, cfg, total_seconds: float) -> Path:
-    """captions: list[{png,start,end}] | Path (.ass) | None."""
+          out: Path, cfg, total_seconds: float, subtitles: Path | None = None) -> Path:
+    """captions: list[{png,start,end}] | Path (.ass) | None. subtitles: soft .srt."""
     w = int(cfg.get("visuals.width", 1080))
     h = int(cfg.get("visuals.height", 1920))
     fps = int(cfg.get("visuals.fps", 30))
@@ -112,6 +112,11 @@ def final(video: Path, voice: Path, captions, music: Path | None,
     if music:
         cmd += ["-stream_loop", "-1", "-i", str(music)]
         music_idx = nxt
+        nxt += 1
+    subs_idx = None
+    if subtitles is not None:
+        cmd += ["-i", str(subtitles)]
+        subs_idx = nxt
         nxt += 1
     for item in pngs or []:
         cmd += ["-loop", "1", "-framerate", str(fps), "-i", item["png"]]
@@ -189,7 +194,80 @@ def final(video: Path, voice: Path, captions, music: Path | None,
         "-movflags", "+faststart",
         str(out),
     ]
+    if subs_idx is not None:
+        # A soft track, not burned-in text: no render cost, YouTube indexes it as
+        # the video's caption, and the viewer can turn it off.
+        cmd[-1:-1] = [
+            "-map", f"{subs_idx}:s",
+            "-c:s", "mov_text",
+            "-metadata:s:s:0", "language=eng",
+        ]
     _run(cmd, "final render")
+    return out
+
+
+def frame_from(clip: Path, out: Path, at: float = 1.0) -> Path:
+    """One JPEG frame from a rendered scene, for a thumbnail."""
+    _run([
+        "ffmpeg", "-y", "-ss", f"{at:.2f}", "-i", str(clip),
+        "-frames:v", "1", "-q:v", "2", str(out),
+    ], "thumbnail frame")
+    return out
+
+
+def thumbnail(cfg, frame: Path, out: Path, title: str) -> Path:
+    """1280x720 thumbnail: the scene's own art, darkened, with the title on it.
+
+    Deliberately not a separate image generation: the thumbnail should look like
+    the video it belongs to, and one more paid image per video is a cost with no
+    creative gain. Text is drawn with the same font the captions use.
+    """
+    from PIL import Image, ImageDraw, ImageFont
+
+    from .captions_png import font_path
+
+    tw, th = 1280, 720
+    img = Image.open(frame).convert("RGB")
+    # cover-crop, never letterbox: a thumbnail with black bars reads as cheap
+    scale = max(tw / img.width, th / img.height)
+    img = img.resize((int(img.width * scale) + 1, int(img.height * scale) + 1))
+    left = (img.width - tw) // 2
+    top = (img.height - th) // 2
+    img = img.crop((left, top, left + tw, top + th))
+
+    shade = Image.new("RGB", (tw, th), (10, 8, 6))
+    img = Image.blend(img, shade, 0.45)
+
+    draw = ImageDraw.Draw(img)
+    size = 84
+    font = ImageFont.truetype(str(font_path(cfg)), size)
+    margin = 64
+    max_w = tw - margin * 2
+    while size > 44:
+        lines: list[str] = []
+        cur = ""
+        for word in title.upper().split():
+            probe = f"{cur} {word}".strip()
+            if draw.textlength(probe, font=font) <= max_w:
+                cur = probe
+            else:
+                lines.append(cur)
+                cur = word
+        if cur:
+            lines.append(cur)
+        if len(lines) <= 3:
+            break
+        size -= 6
+        font = ImageFont.truetype(str(font_path(cfg)), size)
+
+    y = th - margin - len(lines) * int(size * 1.12)
+    for line in lines:
+        draw.text((margin + 3, y + 3), line, font=font, fill=(0, 0, 0))
+        draw.text((margin, y), line, font=font, fill=(255, 250, 240))
+        y += int(size * 1.12)
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    img.save(out, quality=92)
     return out
 
 

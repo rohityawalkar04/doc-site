@@ -201,6 +201,21 @@ def upload(cfg, video: Path, meta: dict) -> dict:
             print(f"      youtube upload {int(status.progress() * 100)}%", flush=True)
 
     vid = response["id"]
+
+    thumb = meta.get("thumbnail")
+    if thumb and Path(str(thumb)).exists():
+        # 50 quota units. A long-form video without a thumbnail falls back to a
+        # random frame from the first seconds, which is the single biggest CTR
+        # cost you can avoid for free.
+        try:
+            svc.thumbnails().set(
+                videoId=vid,
+                media_body=MediaFileUpload(str(thumb), mimetype="image/jpeg"),
+            ).execute()
+            print("      thumbnail set")
+        except Exception as e:  # noqa: BLE001 - an upload without it still shipped
+            print(f"      ! thumbnail not set ({type(e).__name__}: {str(e)[:120]})")
+
     requested = body["status"]["privacyStatus"]
     actual = (response.get("status") or {}).get("privacyStatus")
     if actual and actual != requested:

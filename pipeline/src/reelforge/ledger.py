@@ -63,13 +63,28 @@ def load() -> list[str]:
     return [e["topic_id"] for e in entries()]
 
 
-def last_published_date() -> str | None:
-    """UTC date of the most recent publish. Used to make retries idempotent."""
-    return _read().get("last_published") or None
+def last_published_date(fmt: str = "reel") -> str | None:
+    """UTC date of the most recent publish *for this format*. Used to make retries
+    idempotent.
+
+    Scoped per format because the two builds share one ledger and one `--once-per-day`
+    guard: without the scope, the 08:37 IST video stamps today's date and the 19:07
+    IST reel then decides a reel has already gone out and exits. A legacy string
+    value (written before formats existed) is the reel's date, which is what it was.
+    """
+    raw = _read().get("last_published")
+    if isinstance(raw, dict):
+        value = raw.get(fmt)
+        return str(value) if value else None
+    # A legacy string predates video builds entirely, so it can only be the
+    # reel's date. Returning it for "video" would make the first video run skip
+    # because a reel had published that same day.
+    return (raw or None) if fmt == "reel" else None
 
 
 def add(topic_id: str | None, when: str | None = None,
-        title: str | None = None, video_id: str | None = None) -> None:
+        title: str | None = None, video_id: str | None = None,
+        fmt: str = "reel") -> None:
     """Idempotent: records a topic once, whatever platform succeeded.
 
     A second call updates the entry in place - that is how a legacy bare string
@@ -106,7 +121,12 @@ def add(topic_id: str | None, when: str | None = None,
 
     p = _path()
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps({"published": new_raw, "last_published": stamp},
+    previous = data.get("last_published")
+    stamps = dict(previous) if isinstance(previous, dict) else (
+        {"reel": previous} if previous else {}
+    )
+    stamps[fmt] = stamp
+    p.write_text(json.dumps({"published": new_raw, "last_published": stamps},
                             indent=2) + "\n")
 
 

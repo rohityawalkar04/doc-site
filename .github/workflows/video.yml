@@ -1,0 +1,242 @@
+name: video
+
+# Build one long-form video and publish it. Same pipeline as the reel build,
+# different format: 16:9, ~2.5 minutes, soft subtitles, thumbnail.
+#
+# Separate workflow rather than a second step in reel.yml so a long render cannot
+# delay the 19:00 IST reel window, and so the two have separate caches, artifacts
+# and dispatch inputs. No half-finished state, no retrying into a broken condition.
+#
+# Runs every evening inside the 19:00-20:00 IST posting window.
+
+on:
+  schedule:
+    # 03:07 UTC = 08:37 IST. Deliberately nowhere near the reel window: a 36-scene
+    # render takes several times as long, and sharing the slot would make the
+    # evening reel late. The second trigger is the same self-heal the reel build
+    # uses, made free by --once-per-day.
+    - cron: "7 3 * * *"        # 08:37 IST
+    - cron: "37 4 * * *"       # 10:07 IST, the fallback
+  workflow_dispatch:
+    inputs:
+      count:
+        description: "how many videos; each one is ~36 scenes"
+        default: "1"
+      mode:
+        description: "publish, or rehearse without uploading"
+        type: choice
+        options:
+          - publish
+          - dry-run
+        default: publish
+
+permissions:
+  contents: write              # commit the ledger after each publish
+
+concurrency:
+  group: pipeline
+  cancel-in-progress: false
+
+jobs:
+  reel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: pipeline
+    steps:
+      - uses: actions/checkout@v4
+
+      # actions/checkout pins the commit that TRIGGERED this run. Read the ledger
+      # from origin so a reel published since then is not built again.
+      - name: Refresh the published ledger from main
+        run: |
+          git fetch --depth=1 origin main
+          git show origin/main:pipeline/state/published.json > state/published.json
+          python3 -c "import json;print('ledger entries:', len(json.load(open('state/published.json'))['published']))"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg >/dev/null
+
+      - name: Install Python dependencies
+        run: pip install --quiet -r requirements.txt
+
+      - name: Verify dependencies and imports
+        env:
+          PYTHONPATH: src
+        run: |
+          python scripts/check_deps.py
+          python -c "
+          import reelforge.cli, reelforge.pipeline, reelforge.captions_png
+          import reelforge.visuals, reelforge.render, reelforge.voice
+          import reelforge.llm, reelforge.meta, reelforge.publish
+          print('imports OK')
+          "
+
+      - name: Cache piper voice
+        uses: actions/cache@v4
+        with:
+          path: pipeline/assets/piper
+          key: piper-en_US-ryan-high-v1
+
+      # 13 images per reel is the expensive part (~600 neurons) and a rebuild of
+      # the same script produces identical seeds, so a warm cache makes retries
+      # free. The free allocation is 10,000 neurons/day.
+      # Illustrations are named by a hash of (reel id, visual_query, scene index),
+      # so a scene that has been rendered once costs nothing to rebuild. The reel
+      # id is part of the key: without it this cache was a channel-wide pool, and
+      # the quota fallback filled stalled scenes from it - which is how three
+      # reels built in one sitting shipped the same pictures. The key used
+      # to be the hash of config/topics.yaml alone - constant for weeks - and
+      # actions/cache skips saving on an exact key hit. So newly generated scenes
+      # were never stored: every run after the first re-rendered all 13 images
+      # (~580 neurons), and three consecutive runs on 17-18 Nov died on the
+      # 10,000-neuron daily budget while building the same reel.
+      #
+      # A per-run key with an `ai-` restore prefix gives the append-only behaviour
+      # the cache was always meant to have: restore the newest snapshot, always
+      # write a new one.
+      - name: Restore generated illustrations
+        uses: actions/cache/restore@v4
+        with:
+          path: pipeline/assets/cache/ai
+          key: aivid-${{ hashFiles('pipeline/config/topics-video.yaml') }}-${{ github.run_id }}
+          restore-keys: |
+            aivid-${{ hashFiles('pipeline/config/topics-video.yaml') }}-
+            aivid-
+
+      - name: Check required secrets are present
+        env:
+          YT_CLIENT_SECRET_JSON: ${{ secrets.YT_CLIENT_SECRET_JSON }}
+          YT_TOKEN_JSON: ${{ secrets.YT_TOKEN_JSON }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          missing=""
+          if [ -z "$YT_CLIENT_SECRET_JSON" ]; then missing="$missing YT_CLIENT_SECRET_JSON"; fi
+          if [ -z "$YT_TOKEN_JSON" ];        then missing="$missing YT_TOKEN_JSON"; fi
+          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then missing="$missing CLOUDFLARE_ACCOUNT_ID"; fi
+          if [ -z "$CLOUDFLARE_API_TOKEN" ];  then missing="$missing CLOUDFLARE_API_TOKEN"; fi
+          if [ -n "$missing" ]; then
+            echo "::error title=Missing repository secrets::Not set:$missing"
+            echo "Settings > Secrets and variables > Actions > New repository secret"
+            exit 1
+          fi
+          echo "required secrets present"
+
+      - name: Materialise credentials
+        env:
+          YT_CLIENT_SECRET_JSON: ${{ secrets.YT_CLIENT_SECRET_JSON }}
+          YT_TOKEN_JSON: ${{ secrets.YT_TOKEN_JSON }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
+          FB_PAGE_TOKEN: ${{ secrets.FB_PAGE_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          mkdir -p secrets
+          printf '%s' "$YT_CLIENT_SECRET_JSON" > secrets/yt_client_secret.json
+          printf '%s' "$YT_TOKEN_JSON" > secrets/yt_token.json
+          {
+            echo "IG_LOGIN_TYPE=facebook"
+            echo "IG_USER_ID=$IG_USER_ID"
+            echo "IG_ACCESS_TOKEN=$IG_ACCESS_TOKEN"
+            echo "FB_PAGE_ID=$FB_PAGE_ID"
+            echo "FB_PAGE_TOKEN=$FB_PAGE_TOKEN"
+            echo "CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID"
+            echo "CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN"
+            echo "IG_HOST=gh_release"
+            echo "GH_RELEASE_REPO=${{ github.repository }}"
+          } > .env
+          chmod 600 .env secrets/*
+
+      - name: Build and publish, one at a time
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AI_BACKEND: cloudflare
+          PYTHONUNBUFFERED: "1"
+        run: |
+          # --once-per-day is a scheduler guard, not a publishing guard. It exists so
+          # the 19:37 IST fallback cron cannot publish a second time after the 19:07
+          # one succeeded. A workflow_dispatch is a person asking for a reel and must
+          # be answered - on 19 Nov a manual `count: 1` run exited with "already
+          # published on 2026-11-19; nothing to do" because this flag was passed for
+          # every trigger.
+          PYTHONPATH=src python -u scripts/cloud_run.py \
+            --format video \
+            --count "${{ github.event.inputs.count || '1' }}" \
+            --record \
+            ${{ github.event_name == 'schedule' && '--once-per-day' || '' }} \
+            ${{ github.event.inputs.mode == 'dry-run' && '--dry-run' || '' }}
+
+      - name: Report illustration cache
+        shell: bash
+        run: |
+          cache_dir="pipeline/assets/cache/ai"
+          mkdir -p "$cache_dir"
+          count="$(find "$cache_dir" -maxdepth 1 -type f -name '*.jpg' | wc -l | tr -d ' ')"
+          size="$(du -sh "$cache_dir" | cut -f1)"
+          echo "AI illustration cache: $count image(s), $size"
+          if [ "$count" -gt 0 ]; then
+            echo "Cached image filenames (first 10):"
+            find "$cache_dir" -maxdepth 1 -type f -name '*.jpg' -printf '%f\\n' | sort | head -10
+          else
+            echo "::notice title=Empty illustration cache::This run will need fresh image generation for every scene."
+          fi
+
+      # Saved even when the build fails: a run that died at scene 6 of 13 has six
+      # images worth keeping, and the retry must not pay for them again. The guard
+      # keeps the step quiet on runs that produced nothing.
+      - name: Save generated illustrations
+        if: always() && hashFiles('pipeline/assets/cache/ai/**') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: pipeline/assets/cache/ai
+          key: aivid-${{ hashFiles('pipeline/config/topics-video.yaml') }}-${{ github.run_id }}
+
+      # Safety net: cloud_run.py records after every reel (--record) and stops the
+      # batch when a push loses. This step runs even on failure, so a reel uploaded
+      # before an error still lands in the ledger, and a lost push still turns the
+      # run red instead of leaving a green run that forgot what it did.
+      - name: Record what was published
+        if: always()
+        run: |
+          # One implementation, in the script the loop itself calls: a second copy
+          # of this git dance is how the two paths drift apart again.
+          # `|| { ... }` rather than a `$?` check because Actions runs this under -e,
+          # which would exit before the annotation below could print.
+          ./scripts/record_ledger.sh || {
+            echo "::error title=Ledger NOT recorded::push failed after 3 attempts. Add the topic_id to state/published.json by hand before the next run."
+            exit 1
+          }
+
+      - name: Reconcile the ledger with the channel
+        if: always()
+        run: |
+          # A guard is a belief; this is the proof. Runs even on failure, because an
+          # upload that landed before an error must still be reconciled against the
+          # ledger. Exit 1 means the channel knows something the ledger does not -
+          # exactly the state that produced the 16 Nov duplicates.
+          PYTHONPATH=src python scripts/check_channel.py || {
+            echo "::error title=Channel drift::the channel and state/published.json disagree - reconcile before the next run"
+            exit 1
+          }
+
+      - name: Upload the renders for inspection
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: videos
+          path: |
+            pipeline/out/*.mp4
+            pipeline/out/*.json
+            pipeline/out/*.jpg
+          if-no-files-found: ignore
+          retention-days: 30

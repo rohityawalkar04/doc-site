@@ -36,6 +36,28 @@ class Config:
             cur = cur.setdefault(key, {})
         cur[keys[-1]] = value
 
+    def apply_format(self, name: str) -> None:
+        """Load a format profile from `formats:` into the live config.
+
+        A format is the difference between a 50-second vertical reel and a
+        three-minute landscape video: aspect, scene count, caption kind, whether
+        a thumbnail is published. Everything else - script, voice, visuals
+        backend, ledger, publishing - is shared, so the two builds cannot drift
+        apart. Unknown names are a hard error: silently falling back would
+        publish a landscape reel.
+        """
+        block = self.get(f"formats.{name}")
+        if not isinstance(block, dict) or not block:
+            raise SystemExit(
+                f"unknown format {name!r}: add it under `formats:` in config/channel.yaml"
+            )
+        self._d["format"] = name
+        for section, values in block.items():
+            if not isinstance(values, dict):
+                continue
+            for key, value in values.items():
+                self.override(f"{section}.{key}", value)
+
     def path(self, p: str | Path) -> Path:
         q = Path(p)
         return q if q.is_absolute() else self.root / q
@@ -60,7 +82,7 @@ def load() -> Config:
     return Config(data)
 
 
-def load_topics() -> list[dict]:
+def load_topics(fmt: str = "reel") -> list[dict]:
     """Hand-written topics first, then the ones composed at runtime.
 
     Two files, one order: `config/topics.yaml` is the curated queue and always
@@ -68,9 +90,17 @@ def load_topics() -> list[dict]:
     what the channel published when that queue ran dry. They are separate files
     because a YAML round-trip through a writer would strip the comments out of
     the hand-curated one, and in this project those comments are the memory.
+
+    A format with a longer script has its own queue: a 30-beat video topic and a
+    13-beat reel are not interchangeable, and mixing them would make the format
+    depend on queue order.
     """
+    files = {
+        "reel": ("topics.yaml", "topics-generated.yaml"),
+        "video": ("topics-video.yaml",),
+    }.get(fmt, (f"topics-{fmt}.yaml",))
     topics: list[dict] = []
-    for name in ("topics.yaml", "topics-generated.yaml"):
+    for name in files:
         f = ROOT / "config" / name
         if not f.exists():
             continue

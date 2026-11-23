@@ -1,0 +1,107 @@
+# Long-form queue. One entry = one landscape video, ~2.5 minutes, 36 scenes.
+#
+# Separate from config/topics.yaml on purpose: a 36-beat narrative and a 13-beat
+# Short are not interchangeable, so mixing the queues would make the format
+# depend on which file the next id happened to come from.
+#
+# What long-form needs that a Short does not:
+#   * a story with a turn in it, not nine tips;
+#   * visual queries that can hold for six to eight seconds, because the shots
+#     are slower than a reel's and a busy image on a long hold is tiring;
+#   * no attributed scripture ("the Mahabharata says...") unless `source:` is set.
+#
+# Check a new entry before pushing:
+#   PYTHONPATH=src python -m reelforge.topics --check      # bank still valid
+#   PYTHONPATH=src python -c "import reelforge.llm as l, reelforge.config as c; ..."
+# or simply run the video workflow with mode: dry-run.
+
+topics:
+  - id: bhishma-kept-his-word
+    kind: myth
+    title: Bhishma kept every promise, and it destroyed his family
+    angle: >-
+      A vow is a decision taken once and applied to situations it never saw.
+      Bhishma's loyalty to a word, rather than to a person or an outcome, is the
+      mechanism behind most of the Mahabharata's disasters - and a habit most of
+      us rehearse in much smaller rooms.
+    hashtags:
+      - "#mahabharata"
+      - "#bhishma"
+      - "#promises"
+      - "#discipline"
+      - "#judgement"
+      - "#mythology"
+      - "#hindumythology"
+    beats:
+      - n: A man who never broke a promise helped destroy his own family.
+        v: an old warrior standing alone on a plain
+      - n: His name was Devavrata, and the story starts with his father's happiness.
+        v: a king standing by a wide river
+      - n: Shantanu loved a fisherman's daughter, and her father wanted her sons crowned.
+        v: a small boat on a calm river
+      - n: The throne was already promised to Devavrata, so the demand made a problem.
+        v: an empty stone throne in a hall
+      - n: He solved it by giving up the crown he was born to inherit.
+        v: a crown set down on a table
+      - n: Then he swore to stay unmarried, so no son of his could ever claim it.
+        v: a hand lifted in a solemn vow
+      - n: The gods called that vow terrible, and the name Bhishma stayed with him.
+        v: dark clouds gathering over a river
+      - n: One promise, made in an afternoon, decided the next fifty years.
+        v: a long road disappearing into haze
+      - n: His father married, and the kingdom finally got the heirs it wanted.
+        v: a wedding lamp burning steadily
+      - n: The vow looked generous, and it removed the one man who could settle disputes.
+        v: a bridge with a gap in the middle
+      - n: When his half-brother died childless, the succession had no obvious answer.
+        v: an empty chair at a long table
+      - n: Bhishma was still bound, so he did the next best thing and kept arranging.
+        v: a hand moving pieces on a board
+      - n: He brought three princesses for a wedding nobody had fully agreed to.
+        v: three closed doors in a corridor
+      - n: One of them, Amba, had already chosen a husband before she arrived.
+        v: a woman standing at a window
+      - n: Bhishma sent her back, because his honour required the correct path.
+        v: a gate closing in soft light
+      - n: Her chosen husband refused her, and the fault was laid at Bhishma's feet.
+        v: a path splitting in two directions
+      - n: She asked the elders for justice, and every one of them deferred to the vow.
+        v: old men seated in a dim hall
+      - n: Amba spent the rest of her life preparing to end his.
+        v: a single flame in a dark room
+      - n: Decades later the family split, and the two branches prepared to fight.
+        v: two armies facing each other at dawn
+      - n: Bhishma commanded one side, because he had given his word to its king.
+        v: a banner raised above a crowd
+      - n: He knew the other side was right, and he fought anyway.
+        v: a warrior standing apart from his men
+      - n: He even told them how he could be defeated, then went out to be defeated.
+        v: a hand pointing at a single weak stone
+      - n: When a woman's face came at him, his own rules stopped his bow.
+        v: a bow lowered to the ground
+      - n: He fell, and the arrows holding him became the bed he died on.
+        v: a still figure on a field of arrows
+      - n: Lying there, he still had lessons to give, and the war stopped to listen.
+        v: a quiet circle of listeners at dusk
+      - n: Every promise he made was kept, and that is exactly the problem.
+        v: a knot pulled tighter on a rope
+      - n: A vow is a decision taken once, applied to situations it never saw.
+        v: a single arrow frozen mid-flight
+      - n: He chose loyalty to a word over judgement about a person.
+        v: a sealed letter resting on a table
+      - n: You do the same thing in smaller rooms, every week.
+        v: a kitchen table with two cups
+      - n: You promise to help, and the promise outlives the reason you made it.
+        v: an open hand holding an old note
+      - n: You stay committed to someone who has stopped being honest with you.
+        v: a door held open for nobody
+      - n: The promise feels like character, and it can be a way of not deciding.
+        v: a figure standing at a closed door
+      - n: Keeping your word is a strength only while the word is still true.
+        v: a hand steadying a candle
+      - n: Bhishma had one rule and no room to revise it.
+        v: a stone wall with one bronze plaque
+      - n: He was the most honourable man in the story, and the most useful to the wrong side.
+        v: a lone figure watched from a hillside
+      - n: Look at one promise you are still keeping out of habit.
+        v: a hand lifting a lid off a box

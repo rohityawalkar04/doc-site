@@ -116,7 +116,8 @@ def publish(cfg, store: state.Store, reel_id: str, platforms: list[str],
         # platform accepted, so the ledger can be reconciled against the channel
         # later - a list of topic ids cannot be joined to anything.
         ledger.add(reel.get("topic_id"), title=meta.get("title"),
-                   video_id=out.get("remote_id") if platform == "youtube" else None)
+                   video_id=out.get("remote_id") if platform == "youtube" else None,
+                   fmt=str(meta.get("format") or "reel"))
         print(f"     done {out.get('url') or out['remote_id']}")
         results[platform] = out
 

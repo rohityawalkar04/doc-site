@@ -21,7 +21,11 @@ def youtube_meta(meta: dict) -> dict:
     if meta.get("cta"):
         description += "\n\n" + meta["cta"].strip()
     description += _source_line(meta)
-    hashtags = list(dict.fromkeys(meta.get("hashtags", []) + YT_EXTRA))
+    # #Shorts is a promise about the file: vertical, under three minutes. Putting
+    # it on a 16:9 long-form video suppresses the normal player and looks like a
+    # mistake, so the format decides.
+    extras = [] if meta.get("format") == "video" else YT_EXTRA
+    hashtags = list(dict.fromkeys(meta.get("hashtags", []) + extras))
     description += "\n\n" + " ".join(hashtags[:12])
     title = meta["title"][:100]
     return {"title": title, "description": description.strip(), "tags": tags[:15]}

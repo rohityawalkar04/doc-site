@@ -138,6 +138,9 @@ def main() -> int:
                     help="when the queue is empty, fail the run instead of composing a "
                          "topic from config/topic-bank.yaml. Use this when you want the "
                          "red run as the reminder that the queue needs writing")
+    ap.add_argument("--format", default="reel", choices=["reel", "video"],
+                    help="which build to produce: a 50s vertical reel, or a 16:9 "
+                         "long-form video from config/topics-video.yaml")
     args = ap.parse_args()
 
     if args.dry_run:
@@ -146,6 +149,7 @@ def main() -> int:
         print("=" * 68, flush=True)
 
     cfg = config.load()
+    cfg.apply_format(args.format)
     cfg.override("script.mode", "beats")          # no LLM in CI
     cfg.override("visuals.provider", "ai_cartoon")
     cfg.override("visuals.ai_backend", os.environ.get("AI_BACKEND", "cloudflare"))
@@ -201,13 +205,19 @@ def main() -> int:
     # otherwise "build for review" would silently do nothing after a good night.
     if args.once_per_day and not args.dry_run and not args.build_only:
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        if ledger.last_published_date() == today:
+        if ledger.last_published_date(args.format) == today:
             print(f"already published on {today}; nothing to do")
             return 0
 
     done = ledger.load()
-    topics = [t for t in config.load_topics() if str(t["id"]) not in done]
+    topics = [t for t in config.load_topics(args.format) if str(t["id"]) not in done]
     if not topics:
+        if args.format != "reel":
+            # The composed bank is 13-scene shaped: stapling three of them together
+            # is reused content, not a long-form script. A video queue is written.
+            print(f"::error title=Out of topics::every topic in "
+                  f"config/topics-{args.format}.yaml has been published - add more")
+            return 1
         # The queue is empty: compose one from config/topic-bank.yaml instead of
         # stopping. The old behaviour - a red run with "add more beats" - was the
         # only reminder that the channel was about to go quiet, so `--no-generate`
@@ -300,7 +310,7 @@ def main() -> int:
                 isinstance(r, dict) and r.get("live_title") for r in result.values()
             )
             if live_skip and not ledger.is_published(str(topic["id"])):
-                ledger.add(str(topic["id"]), title=topic["title"])
+                ledger.add(str(topic["id"]), title=topic["title"], fmt=args.format)
                 print("  channel already had this title - recorded it so the "
                       "rotation moves on", flush=True)
 
