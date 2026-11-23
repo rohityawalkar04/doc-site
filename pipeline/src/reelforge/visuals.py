@@ -589,6 +589,17 @@ def for_scene(cfg, store, index: int, seconds: float, query: str, out: Path,
             img = generate_image(cfg, query, seed, dest)
             visual_id = f"ai:{seed:08x}" if img is not None else ""
 
+        if img is None and _AI_QUOTA_EXHAUSTED and os.environ.get("AI_CACHE_ONLY", "").strip() != "1":
+            # The allocation ran out *during* this build. Carrying on would spend
+            # the remaining scenes' TTS and the whole render on a file that has to
+            # repeat images, and then fail the upload. Stop here: the images
+            # already made are cached and the retry after the reset is free.
+            raise AiQuotaExhausted(
+                "Cloudflare Workers AI allocation ran out mid-reel.\n"
+                "  Stopping rather than repeating images for the remaining scenes.\n"
+                "  Resets at 00:00 UTC = 05:30 IST; the scenes already made are cached."
+            )
+
         if img is None:
             # Quota gone, or nothing generated. Borrow from THIS REEL's earlier
             # scenes only: `image_path` prefixes every file with the reel id, so

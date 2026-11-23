@@ -96,6 +96,13 @@ def preflight(cfg) -> list[str]:
                 "\n     -> publishing the OAuth app to production removes this permanently."
             )
         problems.append(f"YouTube token cannot refresh: {detail[:200]}{hint}")
+
+    if not problems:
+        from reelforge.publish import youtube as youtube_mod
+
+        quota = youtube_mod.quota_check(cfg)
+        if quota:
+            problems.append(quota)
     return problems
 
 

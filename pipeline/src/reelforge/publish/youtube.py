@@ -168,6 +168,34 @@ def watch_url(fmt: str, vid: str) -> str:
     return f"https://youtube.com/shorts/{vid}"
 
 
+def quota_check(cfg) -> str | None:
+    """One-unit Data API call that proves the token AND the daily quota.
+
+    `videos.insert` costs 1,600 units of the project's 10,000/day. If they are
+    already gone, a run would spend a whole build - 585 neurons and ten minutes
+    for a reel, 1,620 and twenty for a video - before discovering it at the
+    upload. `channels.list` costs one unit and fails with `quotaExceeded` in
+    exactly that state, so the refusal costs 0.0001% of what it saves.
+
+    Returns None when the project can still upload, or a problem string.
+    """
+    try:
+        svc = _service(cfg)
+        svc.channels().list(part="id", mine=True).execute()
+    except Exception as e:  # noqa: BLE001 - the message is the finding
+        msg = str(e)
+        low = msg.lower()
+        if "quota" in low:
+            return (
+                "YouTube API quota exhausted for this project (10,000 units/day).\n"
+                "     1,600 of them go on one upload.\n"
+                "     Resets at midnight Pacific = 12:30 IST.\n"
+                "     Refusing to build: the upload would fail after the render."
+            )
+        return f"YouTube API call failed (token or network, not quota): {msg[:200]}"
+    return None
+
+
 def upload(cfg, video: Path, meta: dict) -> dict:
     from googleapiclient.http import MediaFileUpload
 
