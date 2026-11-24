@@ -112,7 +112,7 @@ def _service(cfg):
         try:
             creds = InstalledAppFlow.from_client_secrets_file(
                 str(secret), SCOPES
-            ).run_local_server(port=0, open_browser=True)
+            ).run_local_server(port=0, open_browser=True, prompt="consent")
         except Exception as e:  # noqa: BLE001 - the message is the whole point
             msg = str(e)
             if "access_denied" in msg.lower() or "403" in msg:
@@ -150,9 +150,11 @@ def authorise(cfg) -> Path:
             "  Google Cloud Console > APIs & Services > Credentials >\n"
             "  Create credentials > OAuth client ID > Desktop app."
         )
+    # Force a fresh consent screen so Google grants the newly added read scope
+    # and returns a refresh token suitable for the GitHub Actions secret.
     creds = InstalledAppFlow.from_client_secrets_file(
         str(secret), SCOPES
-    ).run_local_server(port=0, open_browser=True)
+    ).run_local_server(port=0, open_browser=True, prompt="consent")
     token.parent.mkdir(parents=True, exist_ok=True)
     token.write_text(creds.to_json())
     try:
