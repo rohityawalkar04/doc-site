@@ -22,7 +22,13 @@ from pathlib import Path
 
 from ..text import title_key  # noqa: F401 - re-exported: check_channel imports it here
 
-SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+# quota_check() calls channels.list(mine=True), which requires youtube.readonly.
+# Both scopes must be granted together during a fresh OAuth consent flow; an
+# existing refresh token cannot acquire a newly added scope by refreshing.
+SCOPES = [
+    "https://www.googleapis.com/auth/youtube.upload",
+    "https://www.googleapis.com/auth/youtube.readonly",
+]
 API = "youtube"
 VERSION = "v3"
 FEED = "https://www.youtube.com/feeds/videos.xml?channel_id={cid}"
@@ -185,6 +191,15 @@ def quota_check(cfg) -> str | None:
     except Exception as e:  # noqa: BLE001 - the message is the finding
         msg = str(e)
         low = msg.lower()
+        if "insufficient authentication scopes" in low or "insufficientpermissions" in low:
+            return (
+                "YouTube OAuth token is missing the youtube.readonly scope required "
+                "by the channel/quota preflight.\n"
+                "     A refresh cannot add scopes to an existing token.\n"
+                "     On your Mac, run: ./scripts/reauth.sh\n"
+                "     Complete Google consent; the script updates YT_TOKEN_JSON in GitHub.\n"
+                "     Then rerun the workflow."
+            )
         if "quota" in low:
             return (
                 "YouTube API quota exhausted for this project (10,000 units/day).\n"
