@@ -263,7 +263,7 @@ def backend_order(cfg) -> list:
         # No pollinations for the cloud backend: it is throttled to ~1 in 5
         # and costs ~60s per image in retries before falling back, which
         # reads as a frozen build.
-        "cloudflare": [_gen_cloudflare, _gen_local],
+        "cloudflare": [_gen_cloudflare, _gen_pollinations, _gen_local],
         "pollinations": [_gen_pollinations, _gen_cloudflare, _gen_local],
     }.get(backend, [_gen_local, _gen_cloudflare, _gen_pollinations])
 
@@ -368,7 +368,7 @@ def _gen_local(cfg, prompt: str, seed: int, dest: Path) -> Path | None:
     return dest
 
 
-def _gen_pollinations(cfg, prompt: str, seed: int, dest: Path) -> Path | None:
+def _gen_pollinations(cfg, prompt: str, seed: int, dest: Path, *, retries: int | None = None, timeout: int | None = None) -> Path | None:
     """Free image generation via Pollinations.
 
     Empirically (Nov 2026): `flux` returns 402, `sana` works but is throttled so
@@ -385,9 +385,9 @@ def _gen_pollinations(cfg, prompt: str, seed: int, dest: Path) -> Path | None:
         "enhance": "false",
     }
     url = POLLINATIONS.format(prompt=quote(prompt))
-    retries = int(cfg.get("visuals.ai_retries", 4))
+    retries = max(1, int(retries if retries is not None else cfg.get("visuals.ai_retries", 4)))
     backoff = float(cfg.get("visuals.ai_backoff", 5))
-    timeout = int(cfg.get("visuals.ai_timeout", 120))
+    timeout = int(timeout if timeout is not None else cfg.get("visuals.ai_timeout", 120))
 
     for attempt in range(retries):
         try:
@@ -544,9 +544,11 @@ def generate_image(cfg, query: str, seed: int, dest: Path) -> Path | None:
         try:
             img = gen(cfg, prompt, seed, dest)
         except AiQuotaExhausted as e:
+            # The account quota is exhausted for the rest of the UTC day.
+            # Remember it and continue to the next configured provider.
             _AI_QUOTA_EXHAUSTED = True
             print(f"    ! {e}")
-            return None
+            continue
         if img is not None:
             return img
     return None
@@ -588,17 +590,6 @@ def for_scene(cfg, store, index: int, seconds: float, query: str, out: Path,
         else:
             img = generate_image(cfg, query, seed, dest)
             visual_id = f"ai:{seed:08x}" if img is not None else ""
-
-        if img is None and _AI_QUOTA_EXHAUSTED and os.environ.get("AI_CACHE_ONLY", "").strip() != "1":
-            # The allocation ran out *during* this build. Carrying on would spend
-            # the remaining scenes' TTS and the whole render on a file that has to
-            # repeat images, and then fail the upload. Stop here: the images
-            # already made are cached and the retry after the reset is free.
-            raise AiQuotaExhausted(
-                "Cloudflare Workers AI allocation ran out mid-reel.\n"
-                "  Stopping rather than repeating images for the remaining scenes.\n"
-                "  Resets at 00:00 UTC = 05:30 IST; the scenes already made are cached."
-            )
 
         if img is None:
             # Quota gone, or nothing generated. Borrow from THIS REEL's earlier
@@ -691,13 +682,16 @@ def probe(cfg, tmp: Path) -> list[tuple[str, bool, str]]:
         try:
             if gen is _gen_cloudflare:
                 img = gen(cfg, PROBE_PROMPT, 1, dest, steps=1)
+            elif gen is _gen_pollinations:
+                # Keep preflight short; full scene generation gets configured retries.
+                img = gen(cfg, PROBE_PROMPT, 1, dest, retries=1, timeout=45)
             else:
                 img = gen(cfg, PROBE_PROMPT, 1, dest)
             took = time.time() - t
         except AiQuotaExhausted as e:
             reason = (str(e).splitlines() or ["allocation exhausted"])[0]
-            results.append((name, False, f"{reason} (fatal, no fallback)"))
-            break
+            results.append((name, False, f"{reason}; trying fallback"))
+            continue
         except Exception as e:  # noqa: BLE001 - the message is the check
             results.append((name, False, f"{type(e).__name__}: {str(e)[:120]}"))
             continue
@@ -705,6 +699,10 @@ def probe(cfg, tmp: Path) -> list[tuple[str, bool, str]]:
             results.append((name, True, f"{img.stat().st_size // 1024} KB in {took:.1f}s"))
             break
         results.append((name, False, f"{_backend_hint(gen, cfg)} ({took:.1f}s)"))
+    # ffmpeg procedural visuals are the final deterministic fallback.
+    if not any(ok for _, ok, _ in results):
+        results.append(("procedural fallback", True,
+                        "AI providers unavailable; simpler ffmpeg visuals will be used"))
     try:
         dest.unlink()
     except OSError:
