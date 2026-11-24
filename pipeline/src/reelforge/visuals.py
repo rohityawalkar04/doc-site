@@ -539,7 +539,12 @@ def generate_image(cfg, query: str, seed: int, dest: Path) -> Path | None:
         if gen is _gen_cloudflare and _AI_QUOTA_EXHAUSTED:
             continue
         try:
-            img = gen(cfg, prompt, seed, dest)
+            if gen is _gen_pollinations and cfg.get("visuals.ai_backend") == "cloudflare":
+                # Anonymous fallback is best-effort; don't let throttling turn
+                # one scene into several minutes of retries.
+                img = gen(cfg, prompt, seed, dest, retries=1, timeout=45)
+            else:
+                img = gen(cfg, prompt, seed, dest)
         except AiQuotaExhausted as e:
             # The account quota is exhausted for the rest of the UTC day.
             # Remember it and continue to the next configured provider.
