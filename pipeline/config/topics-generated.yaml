@@ -154,3 +154,41 @@ topics:
   - n: Restart at half size tonight, and keep the habit, not the streak
     v: a finger pressing a small button
   theme: restart
+- id: you-are-hiding-the-work-until-it-is-safe
+  title: You are hiding the work until it is safe
+  angle: Hiding the work protects your estimate of it, not the work. The version nobody sees cannot be
+    corrected, and the fear is usually of discovering a guess rather than of being judged.
+  hashtags:
+  - '#creativity'
+  - '#feedback'
+  - '#shipping'
+  - '#mindset'
+  - '#discipline'
+  beats:
+  - n: You are protecting it from criticism, and from anyone helping
+    v: a person standing at the edge of a pool
+  - n: Waiting to be safe means nobody sees it, nobody corrects it
+    v: a window with rain running down it
+  - n: Show one person the rough version and ask one question
+    v: a small lamp switched on in a dark room
+  - n: Name what you want feedback on, or you will get something else
+    v: a hand turning a page of a book
+  - n: Send it before the second edit, not after the fifth
+    v: a short ladder leaning against a wall
+  - n: Write the criticism you fear, then test whether it is true
+    v: a single key laid on a table
+  - n: Collect three reactions and look for the repeat
+    v: a hand placing one block on top of another
+  - n: Fix one thing per round, not everything at once
+    v: a footbridge over a narrow stream
+  - n: Keep a list of what people ignore, it is data
+    v: a hand writing a short note
+  - n: Publish the version you would defend in one sentence
+    v: a kitchen timer on a plain counter
+  - n: Ask the person who will still be there next year
+    v: a hand closing a laptop slowly
+  - n: Being seen badly once beats being seen nowhere for a year
+    v: a road curving toward the horizon
+  - n: Send one rough thing to one person before the week ends
+    v: a hand lifting a telephone
+  theme: feedback
