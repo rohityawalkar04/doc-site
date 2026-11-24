@@ -125,15 +125,22 @@ def _script_check(cfg):
 
 
 def _image_checks(cfg, tmp: Path) -> list[Check]:
-    """Every backend a build would try, stopping at the first that answers."""
-    out: list[Check] = []
-    for name, ok, detail in visuals.probe(cfg, tmp):
-        out.append(Check("images", name, ok, detail))
-        if ok:
-            break
-    if not out:
-        out.append(Check("images", "backend", False, "no backend configured"))
-    return out
+    """Pass when any configured image backend works; earlier failures are fallbacks."""
+    results = visuals.probe(cfg, tmp)
+    if not results:
+        return [Check("images", "backend", False, "no backend configured")]
+
+    # Cloudflare quota exhaustion is not fatal when Pollinations or the
+    # procedural renderer can still produce usable scenes. Keep the failed
+    # provider visible in the detail, but report the image capability as OK.
+    failures = [f"{name}: {detail}" for name, ok, detail in results if not ok]
+    successes = [(name, detail) for name, ok, detail in results if ok]
+    if successes:
+        name, detail = successes[-1]
+        prefix = ("fallback used; " + "; ".join(failures) + "; " if failures else "")
+        return [Check("images", name, True, prefix + detail)]
+
+    return [Check("images", name, False, detail) for name, _, detail in results]
 
 
 def _voice_check(cfg, tmp: Path) -> Check:
