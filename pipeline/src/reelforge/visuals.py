@@ -586,7 +586,7 @@ def for_scene(cfg, store, index: int, seconds: float, query: str, out: Path,
             img = dest
             visual_id = f"ai:{seed:08x}"
             print(f"    [AI cache HIT] {dest.name} ({dest.stat().st_size:,} bytes)")
-        elif os.environ.get("AI_CACHE_ONLY", "").strip() == "1" or _AI_QUOTA_EXHAUSTED:
+        elif os.environ.get("AI_CACHE_ONLY", "").strip() == "1":
             img = None
             visual_id = ""
         else:
