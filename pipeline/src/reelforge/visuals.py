@@ -260,9 +260,8 @@ def backend_order(cfg) -> list:
     backend = cfg.get("visuals.ai_backend", "local_sd")
     return {
         "local_sd": [_gen_local, _gen_cloudflare, _gen_pollinations],
-        # No pollinations for the cloud backend: it is throttled to ~1 in 5
-        # and costs ~60s per image in retries before falling back, which
-        # reads as a frozen build.
+        # Cloudflare is preferred in CI; Pollinations is the hosted fallback
+        # when the daily Cloudflare allocation is exhausted or unavailable.
         "cloudflare": [_gen_cloudflare, _gen_pollinations, _gen_local],
         "pollinations": [_gen_pollinations, _gen_cloudflare, _gen_local],
     }.get(backend, [_gen_local, _gen_cloudflare, _gen_pollinations])
@@ -536,10 +535,6 @@ def generate_image(cfg, query: str, seed: int, dest: Path) -> Path | None:
     prompt = build_prompt(cfg, query)
 
     global _AI_QUOTA_EXHAUSTED
-    if _AI_QUOTA_EXHAUSTED:
-        print("    ! Cloudflare quota already exhausted in this run; skipping further AI requests")
-        return None
-
     for gen in backend_order(cfg):
         if gen is _gen_cloudflare and _AI_QUOTA_EXHAUSTED:
             continue
