@@ -541,6 +541,8 @@ def generate_image(cfg, query: str, seed: int, dest: Path) -> Path | None:
         return None
 
     for gen in backend_order(cfg):
+        if gen is _gen_cloudflare and _AI_QUOTA_EXHAUSTED:
+            continue
         try:
             img = gen(cfg, prompt, seed, dest)
         except AiQuotaExhausted as e:
