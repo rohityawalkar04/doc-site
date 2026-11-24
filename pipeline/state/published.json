@@ -324,7 +324,15 @@
       "published_at": "2026-11-23",
       "title": "Nobody is coming to give you permission",
       "video_id": "NjFs-VXwmQI"
+    },
+    {
+      "topic_id": "the-gap-is-not-what-undid-you",
+      "published_at": "2026-11-24",
+      "title": "The gap is not what undid you",
+      "video_id": "pCukvMdXJp4"
     }
   ],
-  "last_published": "2026-11-23"
+  "last_published": {
+    "reel": "2026-11-24"
+  }
 }
