@@ -10,13 +10,6 @@ name: video
 # Runs every evening inside the 19:00-20:00 IST posting window.
 
 on:
-  schedule:
-    # 03:07 UTC = 08:37 IST. Deliberately nowhere near the reel window: a 36-scene
-    # render takes several times as long, and sharing the slot would make the
-    # evening reel late. The second trigger is the same self-heal the reel build
-    # uses, made free by --once-per-day.
-    - cron: "7 3 * * *"        # 08:37 IST
-    - cron: "37 4 * * *"       # 10:07 IST, the fallback
   workflow_dispatch:
     inputs:
       count:
