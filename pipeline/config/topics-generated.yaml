@@ -192,3 +192,41 @@ topics:
   - n: Send one rough thing to one person before the week ends
     v: a hand lifting a telephone
   theme: feedback
+- id: you-would-rather-guess-than-ask
+  title: You would rather guess than ask
+  angle: A guess is not free, it is a loan against your own time. The awkward moment of asking is short,
+    and the wrong assumption it avoids can last a month.
+  hashtags:
+  - '#communication'
+  - '#work'
+  - '#confidence'
+  - '#mindset'
+  - '#discipline'
+  beats:
+  - n: You spent the week guessing, and one message would have settled it
+    v: a single empty chair beside a desk
+  - n: You protect your image by paying in hours you cannot bill
+    v: a stack of papers leaning sideways
+  - n: Write the question as one sentence with the decision attached
+    v: a hand turning a page of a book
+  - n: Name the two options you are choosing between out loud
+    v: a short ladder leaning against a wall
+  - n: Send it early in the day, when people are still generous
+    v: a single key laid on a table
+  - n: Say what you already tried, so the answer is cheap to give
+    v: a hand placing one block on top of another
+  - n: Ask the person with the least to gain from flattering you
+    v: a footbridge over a narrow stream
+  - n: Set a time after which you stop waiting and choose
+    v: a hand writing a short note
+  - n: Write down the answer before you act, while it is fresh
+    v: a kitchen timer on a plain counter
+  - n: Thank them in one line and tell them what you did
+    v: a hand closing a laptop slowly
+  - n: Keep a list of the questions you were afraid to ask
+    v: a stamped envelope on a table
+  - n: The answer was always going to cost less than the guessing
+    v: a cup of tea beside a finished page
+  - n: Ask today, and stop paying for silence with your time
+    v: a footprint in fresh snow
+  theme: asking
