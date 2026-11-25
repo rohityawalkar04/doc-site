@@ -6,18 +6,6 @@ name: reel
 # Runs every evening inside the 19:00-20:00 IST posting window.
 
 on:
-  schedule:
-    # 13:37 UTC = 19:07 IST. Inside the window, early enough that a single reel
-    # finishes well before 20:00. :37 rather than :00/:30 because GitHub's
-    # scheduler is worst at the top of the hour and can drop runs under load.
-    #
-    # Two triggers, not one, because GitHub's scheduler is best-effort and this
-    # repo has seen exactly one schedule event in three days (17 Nov 21:53 UTC,
-    # eight hours late). A second chance 30 minutes later costs nothing:
-    # --once-per-day turns the duplicate trigger into a no-op once a reel has
-    # published that UTC day.
-    - cron: "37 13 * * *"      # 19:07 IST
-    - cron: "7 14 * * *"       # 19:37 IST, the fallback
   workflow_dispatch:
     inputs:
       count:
