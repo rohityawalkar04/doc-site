@@ -336,9 +336,16 @@
       "published_at": "2026-11-24",
       "title": "You are hiding the work until it is safe",
       "video_id": "w5B5x8bF5x0"
+    },
+    {
+      "topic_id": "bhishma-kept-his-word",
+      "published_at": "2026-11-25",
+      "title": "Bhishma kept every promise, and it destroyed his family",
+      "video_id": "zkh4c8YGplg"
     }
   ],
   "last_published": {
-    "reel": "2026-11-24"
+    "reel": "2026-11-24",
+    "video": "2026-11-25"
   }
 }
