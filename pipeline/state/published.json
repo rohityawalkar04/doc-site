@@ -348,10 +348,16 @@
       "published_at": "2026-11-25",
       "title": "You would rather guess than ask",
       "video_id": "EhdnVECafBQ"
+    },
+    {
+      "topic_id": "readiness-arrives-after-the-first-attempt",
+      "published_at": "2026-11-26",
+      "title": "Readiness arrives after the first attempt",
+      "video_id": "qLQnR04pwSQ"
     }
   ],
   "last_published": {
-    "reel": "2026-11-25",
+    "reel": "2026-11-26",
     "video": "2026-11-25"
   }
 }
